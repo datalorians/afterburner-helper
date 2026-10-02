@@ -6,13 +6,43 @@ views:
     badges: []
     cards:
       - type: thermostat
-        entity: climate.afterburner
-        name: Diesel Heater
+        entity: climate.climate_control_afterburner_heat_group
+        name: All Heaters
         features:
           - type: climate-hvac-modes
             hvac_modes:
               - "off"
               - heat
+      - type: entities
+        title: Heat Staging
+        show_header_toggle: false
+        entities:
+          - entity: select.climate_control_afterburner_heat_source_priority
+            name: Demand order
+          - entity: switch.climate_control_afterburner_electric_heater_1_lockout
+            name: Lock out Electric Heater 1
+          - entity: switch.climate_control_afterburner_electric_heater_2_lockout
+            name: Lock out Electric Heater 2
+          - entity: switch.climate_control_afterburner_diesel_lockout
+            name: Lock out Diesel Heater
+      - type: thermostat
+        entity: climate.climate_control_afterburner_electric_heater_1
+        name: Electric Heater 1
+        features:
+          - type: climate-hvac-modes
+            hvac_modes: ["off", heat, auto]
+      - type: thermostat
+        entity: climate.climate_control_afterburner_electric_heater_2
+        name: Electric Heater 2
+        features:
+          - type: climate-hvac-modes
+            hvac_modes: ["off", heat, auto]
+      - type: thermostat
+        entity: climate.climate_control_afterburner_diesel_heater
+        name: Diesel Heater
+        features:
+          - type: climate-hvac-modes
+            hvac_modes: ["off", heat, auto]
 
   - title: Diesel Heater
     path: diesel-heater
@@ -148,11 +178,27 @@ views:
     icon: mdi:radiator-disabled
     badges: []
     cards:
+      - type: entities
+        title: Electric Heater Configuration
+        show_header_toggle: false
+        entities:
+          - entity: select.climate_control_afterburner_heat_source_priority
+            name: Heat source priority
+          - entity: switch.climate_control_afterburner_electric_heater_1_lockout
+          - entity: switch.climate_control_afterburner_electric_heater_2_lockout
+          - entity: switch.climate_control_afterburner_diesel_lockout
+      - type: thermostat
+        entity: climate.climate_control_afterburner_electric_heater_1
+        name: Electric Heater 1
+      - type: thermostat
+        entity: climate.climate_control_afterburner_electric_heater_2
+        name: Electric Heater 2
       - type: markdown
-        title: Electric Heaters
+        title: Smart-plug Assignment
         content: >-
-          Electric heater controls will live here when they are added. This page
-          is reserved so those controls do not clutter the main Climate page.
+          Smart-plug targets are selected under Settings → Devices & services →
+          Afterburner Helper → Configure. Electric Heater 1 defaults to
+          switch.s31_3_sonoff_s31_relay; Electric Heater 2 is optional.
 
   - title: Thermostat & Cyclic
     path: thermostat-cyclic

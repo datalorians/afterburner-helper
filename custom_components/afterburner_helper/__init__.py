@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from .const import DOMAIN, PLATFORMS
 from .coordinator import AfterburnerCoordinator
 from .settings import AfterburnerSettingsHub
+from .staging import HeatGroupManager
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -31,6 +32,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = AfterburnerCoordinator(hass, entry)
     coordinator.settings_hub = AfterburnerSettingsHub(hass, entry)
     await coordinator.settings_hub.async_start()
+    coordinator.heat_group = HeatGroupManager(hass, entry)
+    await coordinator.heat_group.async_start()
     await coordinator.async_initialize()
     await coordinator.async_config_entry_first_refresh()
     coordinator.async_start()
@@ -47,5 +50,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if unload_ok:
         coordinator: AfterburnerCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
         await coordinator.settings_hub.async_stop()
+        await coordinator.heat_group.async_stop()
         coordinator.async_stop()
     return unload_ok

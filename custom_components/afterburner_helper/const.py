@@ -8,7 +8,14 @@ from homeassistant.const import Platform
 
 DOMAIN = "afterburner_helper"
 INTEGRATION_NAME = "Afterburner Helper"
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.BUTTON]
+PLATFORMS: list[Platform] = [
+    Platform.SENSOR,
+    Platform.NUMBER,
+    Platform.BUTTON,
+    Platform.CLIMATE,
+    Platform.SELECT,
+    Platform.SWITCH,
+]
 COORDINATOR_INTERVAL = timedelta(seconds=10)
 
 CONF_DEVICE_NAME = "device_name"
@@ -32,6 +39,9 @@ CONF_RECOVERY_TIMEOUT_S = "recovery_timeout_s"
 CONF_RECOVERY_MIN_RISE_C = "recovery_minimum_rise_c"
 CONF_CLIMATE_ENTITY_ID = "climate_entity_id"
 CONF_DIESEL_PRICE_PER_LITRE = "diesel_price_per_litre"
+CONF_ROOM_TEMPERATURE_ENTITY_ID = "room_temperature_entity_id"
+CONF_ELECTRIC_HEATER_1_ENTITY_ID = "electric_heater_1_entity_id"
+CONF_ELECTRIC_HEATER_2_ENTITY_ID = "electric_heater_2_entity_id"
 
 DEFAULT_DEVICE_NAME = "Afterburner"
 DEFAULT_MQTT_TOPIC_PREFIX = "Afterburner"
@@ -49,6 +59,24 @@ DEFAULT_RECOVERY_SETPOINT_C = 35.0
 DEFAULT_RECOVERY_TIMEOUT_S = 120.0
 DEFAULT_RECOVERY_MIN_RISE_C = 5.0
 DEFAULT_DIESEL_PRICE_PER_LITRE = 0.0
+DEFAULT_ROOM_TEMPERATURE_ENTITY_ID = "sensor.afterburner_temperature_3"
+DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID = "switch.s31_3_sonoff_s31_relay"
+DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID = ""
+
+HEAT_SOURCES = ("diesel", "electric_1", "electric_2")
+HEAT_SOURCE_LABELS = {
+    "diesel": "Diesel",
+    "electric_1": "Electric 1",
+    "electric_2": "Electric 2",
+}
+PRIORITY_OPTIONS = (
+    "Electric 1 → Electric 2 → Diesel",
+    "Electric 1 → Diesel → Electric 2",
+    "Electric 2 → Electric 1 → Diesel",
+    "Electric 2 → Diesel → Electric 1",
+    "Diesel → Electric 1 → Electric 2",
+    "Diesel → Electric 2 → Electric 1",
+)
 
 # Existing MQTT/autodiscovery entities used as read-only sources. These become
 # configurable in the next config-flow milestone.

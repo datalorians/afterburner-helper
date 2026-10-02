@@ -11,6 +11,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
+from .coordinator import AfterburnerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -21,11 +22,45 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Afterburner switch platform."""
-    data = hass.data[DOMAIN][config_entry.entry_id]
-    topic_prefix = data["mqtt_topic_prefix"]
-    device_name = data["device_name"]
+    coordinator: AfterburnerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    topic_prefix = coordinator.settings_hub.topic_prefix
+    device_name = config_entry.title
 
-    async_add_entities([AfterburnerFlameoutRecoverySwitch(topic_prefix, device_name, config_entry.entry_id)])
+    async_add_entities([
+        AfterburnerFlameoutRecoverySwitch(topic_prefix, device_name, config_entry.entry_id),
+        HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "diesel", "Afterburner Diesel Lockout"),
+        HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "electric_1", "Afterburner Electric Heater 1 Lockout"),
+        HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "electric_2", "Afterburner Electric Heater 2 Lockout"),
+    ])
+
+
+class HeatSourceLockoutSwitch(SwitchEntity):
+    """Exclude one source from automatic staging without losing its target."""
+
+    _attr_has_entity_name = False
+    _attr_icon = "mdi:lock-outline"
+
+    def __init__(self, entry, manager, source: str, name: str) -> None:
+        self.manager = manager
+        self.source = source
+        self._attr_name = name
+        self._attr_unique_id = f"{entry.entry_id}_{source}_lockout"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_heat_group")},
+            name="Climate Control",
+            manufacturer="Afterburner Helper",
+            model="Staged Heat Group",
+        )
+
+    @property
+    def is_on(self) -> bool:
+        return self.manager.lockouts[self.source]
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.manager.async_set_lockout(self.source, True)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.manager.async_set_lockout(self.source, False)
 
 
 class AfterburnerFlameoutRecoverySwitch(SwitchEntity):

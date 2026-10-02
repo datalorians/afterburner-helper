@@ -6,16 +6,20 @@ from typing import Any
 
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.helpers import selector
 
 from .const import (
     CONF_ACTIVE_CONTROL_ENABLED,
     CONF_CLIMATE_ENTITY_ID,
     CONF_DEVICE_NAME,
     CONF_DIESEL_PRICE_PER_LITRE,
+    CONF_ELECTRIC_HEATER_1_ENTITY_ID,
+    CONF_ELECTRIC_HEATER_2_ENTITY_ID,
     CONF_LOWER_OFFSET_C,
     CONF_MAXIMUM_PUMP_HZ,
     CONF_MINIMUM_PUMP_HZ,
     CONF_MQTT_TOPIC_PREFIX,
+    CONF_ROOM_TEMPERATURE_ENTITY_ID,
     CONF_PUMP_ML_PER_STROKE,
     CONF_EARLY_RECOVERY_ENABLED,
     CONF_RECOVERY_MIN_RISE_C,
@@ -29,11 +33,14 @@ from .const import (
     CONF_USAGE_CORRECTION_FACTOR,
     DEFAULT_DEVICE_NAME,
     DEFAULT_DIESEL_PRICE_PER_LITRE,
+    DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
+    DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
     DEFAULT_CLIMATE_ENTITY_ID,
     DEFAULT_LOWER_OFFSET_C,
     DEFAULT_MAXIMUM_PUMP_HZ,
     DEFAULT_MINIMUM_PUMP_HZ,
     DEFAULT_MQTT_TOPIC_PREFIX,
+    DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
     DEFAULT_PUMP_ML_PER_STROKE,
     DEFAULT_RECOVERY_MIN_RISE_C,
     DEFAULT_RECOVERY_SETPOINT_C,
@@ -145,6 +152,35 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     CONF_CLIMATE_ENTITY_ID, DEFAULT_CLIMATE_ENTITY_ID
                 ),
             ): str,
+            vol.Required(
+                CONF_ROOM_TEMPERATURE_ENTITY_ID,
+                default=defaults.get(
+                    CONF_ROOM_TEMPERATURE_ENTITY_ID,
+                    DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
+                ),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Optional(
+                CONF_ELECTRIC_HEATER_1_ENTITY_ID,
+                default=defaults.get(
+                    CONF_ELECTRIC_HEATER_1_ENTITY_ID,
+                    DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
+                ),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="switch")
+            ),
+            vol.Optional(
+                CONF_ELECTRIC_HEATER_2_ENTITY_ID,
+                description={
+                    "suggested_value": defaults.get(
+                        CONF_ELECTRIC_HEATER_2_ENTITY_ID,
+                        DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
+                    ) or None
+                },
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="switch")
+            ),
         }
     )
 

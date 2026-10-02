@@ -35,7 +35,10 @@
           "recovery_setpoint_c": "Recovery demand setpoint (°C)",
           "recovery_timeout_s": "Recovery response timeout (seconds)",
           "recovery_minimum_rise_c": "Required exchanger-temperature rise (°C)",
-          "climate_entity_id": "Afterburner climate entity"
+          "climate_entity_id": "Afterburner climate entity",
+          "room_temperature_entity_id": "Shared room-temperature sensor",
+          "electric_heater_1_entity_id": "Electric Heater 1 smart-plug switch",
+          "electric_heater_2_entity_id": "Electric Heater 2 smart-plug switch (optional)"
         }
       }
     }
