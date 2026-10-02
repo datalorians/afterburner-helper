@@ -25,6 +25,14 @@ start and shutdown commands.
 > This is an independent community project. It is not affiliated with or
 > endorsed by Afterburner or Home Assistant.
 
+## Dashboard preview
+
+<a href="docs/images/dashboard-overview.png">
+  <img src="docs/images/dashboard-overview.png" alt="Afterburner Helper dashboard showing heater status, fuel level, cost, automatic control, occupancy, and history">
+</a>
+
+<p align="center"><sub>Live Home Assistant dashboard using Afterburner Helper telemetry and controls. Select the image for the full-resolution view.</sub></p>
+
 ## Capabilities
 
 | ⛽ Fuel | 🌡️ Climate | 🔥 Combustion | 📈 History |
