@@ -1,0 +1,177 @@
+input_boolean:
+  diesel_heater_occupancy_control:
+    name: Diesel heater occupancy control
+    icon: mdi:home-thermometer
+
+  diesel_heater_guest_mode:
+    name: Diesel heater guest mode
+    icon: mdi:account-multiple
+
+input_number:
+  diesel_heater_home_temperature:
+    name: Diesel heater home temperature
+    icon: mdi:home-thermometer-outline
+    min: 5
+    max: 30
+    step: 0.5
+    unit_of_measurement: °C
+    mode: box
+
+  diesel_heater_away_temperature:
+    name: Diesel heater away temperature
+    icon: mdi:home-export-outline
+    min: 5
+    max: 25
+    step: 0.5
+    unit_of_measurement: °C
+    mode: box
+
+  diesel_heater_away_delay:
+    name: Diesel heater away delay
+    icon: mdi:timer-outline
+    min: 0
+    max: 120
+    step: 5
+    unit_of_measurement: min
+    mode: box
+
+template:
+  - binary_sensor:
+      - name: Diesel heater occupied
+        unique_id: diesel_heater_occupied
+        icon: >-
+          {{ 'mdi:home-account' if this.state == 'on' else 'mdi:home-export-outline' }}
+        state: >-
+          {{ is_state('person.your_name', 'home')
+             or is_state('input_boolean.diesel_heater_guest_mode', 'on') }}
+        attributes:
+          presence_source: >-
+            {% if is_state('input_boolean.diesel_heater_guest_mode', 'on') %}
+              Guest mode
+            {% elif is_state('person.your_name', 'home') %}
+              Phone
+            {% else %}
+              Away
+            {% endif %}
+
+  - sensor:
+      - name: Diesel heater occupancy climate mode
+        unique_id: diesel_heater_occupancy_climate_mode
+        icon: mdi:thermostat-auto
+        state: >-
+          {% if is_state('input_boolean.diesel_heater_occupancy_control', 'off') %}
+            Disabled
+          {% elif is_state('person.your_name', 'home')
+                  or is_state('input_boolean.diesel_heater_guest_mode', 'on') %}
+            Home
+          {% else %}
+            Away
+          {% endif %}
+        attributes:
+          target_temperature: >-
+            {% if is_state('person.your_name', 'home')
+                  or is_state('input_boolean.diesel_heater_guest_mode', 'on') %}
+              {{ states('input_number.diesel_heater_home_temperature') | float(23) }}
+            {% else %}
+              {{ states('input_number.diesel_heater_away_temperature') | float(15) }}
+            {% endif %}
+
+automation:
+  - id: diesel_heater_occupancy_arrival
+    alias: Diesel heater - Restore home temperature on arrival
+    description: Restore the occupied demand immediately when the tracked phone arrives home.
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: person.your_name
+        to: home
+      - trigger: state
+        entity_id: input_boolean.diesel_heater_guest_mode
+        to: "on"
+    conditions:
+      - condition: state
+        entity_id: input_boolean.diesel_heater_occupancy_control
+        state: "on"
+    actions:
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.afterburner
+        data:
+          temperature: >-
+            {{ states('input_number.diesel_heater_home_temperature') | float(23) }}
+
+  - id: diesel_heater_occupancy_departure
+    alias: Diesel heater - Set away temperature after departure
+    description: Apply the standby demand after the phone has remained away for the configured delay.
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: person.your_name
+        from: home
+        for:
+          minutes: >-
+            {{ states('input_number.diesel_heater_away_delay') | int(15) }}
+    conditions:
+      - condition: state
+        entity_id: input_boolean.diesel_heater_occupancy_control
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.diesel_heater_guest_mode
+        state: "off"
+      - condition: not
+        conditions:
+          - condition: state
+            entity_id: person.your_name
+            state: home
+    actions:
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.afterburner
+        data:
+          temperature: >-
+            {{ states('input_number.diesel_heater_away_temperature') | float(15) }}
+
+  - id: diesel_heater_occupancy_sync
+    alias: Diesel heater - Sync occupancy temperature controls
+    description: Apply control changes and updated Home or Away temperatures to the active occupancy mode.
+    mode: restart
+    triggers:
+      - trigger: state
+        entity_id: input_boolean.diesel_heater_occupancy_control
+        to: "on"
+      - trigger: state
+        entity_id: input_boolean.diesel_heater_guest_mode
+        to: "off"
+      - trigger: state
+        entity_id:
+          - input_number.diesel_heater_home_temperature
+          - input_number.diesel_heater_away_temperature
+    conditions:
+      - condition: state
+        entity_id: input_boolean.diesel_heater_occupancy_control
+        state: "on"
+    actions:
+      - choose:
+          - conditions:
+              - condition: or
+                conditions:
+                  - condition: state
+                    entity_id: person.your_name
+                    state: home
+                  - condition: state
+                    entity_id: input_boolean.diesel_heater_guest_mode
+                    state: "on"
+            sequence:
+              - action: climate.set_temperature
+                target:
+                  entity_id: climate.afterburner
+                data:
+                  temperature: >-
+                    {{ states('input_number.diesel_heater_home_temperature') | float(23) }}
+        default:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.afterburner
+            data:
+              temperature: >-
+                {{ states('input_number.diesel_heater_away_temperature') | float(15) }}

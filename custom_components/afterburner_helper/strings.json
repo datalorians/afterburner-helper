@@ -1,0 +1,43 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Afterburner Helper",
+        "description": "Create the redesigned helper for the existing Afterburner MQTT entities. Automatic commands remain off until explicitly enabled in options.",
+        "data": {
+          "device_name": "Friendly name",
+          "mqtt_topic_prefix": "MQTT topic prefix",
+          "tank_capacity": "Tank capacity"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This Afterburner topic is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Afterburner Helper v2 settings",
+        "description": "Configure the canonical fuel model and active heater controller.",
+        "data": {
+          "tank_capacity": "Tank capacity (L)",
+          "diesel_price_per_litre": "Diesel price (CAD/L)",
+          "pump_ml_per_stroke": "Pump calibration (mL/stroke)",
+          "usage_correction_factor": "Fuel-usage correction factor",
+          "minimum_pump_hz": "Effective minimum pump frequency (Hz)",
+          "maximum_pump_hz": "Effective maximum pump frequency (Hz)",
+          "thermal_cycling_enabled": "Enable automatic temperature cycling",
+          "stop_offset_c": "Stop offset above setpoint (°C)",
+          "start_offset_c": "Start offset below setpoint (°C)",
+          "active_control_enabled": "Enable active start/stop and recovery commands",
+          "early_recovery_enabled": "Enable bounded early flameout recovery",
+          "recovery_setpoint_c": "Recovery demand setpoint (°C)",
+          "recovery_timeout_s": "Recovery response timeout (seconds)",
+          "recovery_minimum_rise_c": "Required exchanger-temperature rise (°C)",
+          "climate_entity_id": "Afterburner climate entity"
+        }
+      }
+    }
+  }
+}

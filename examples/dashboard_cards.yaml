@@ -1,0 +1,111 @@
+# Canonical Diesel Heat cards for Afterburner Helper v2
+
+- type: thermostat
+  entity: climate.afterburner
+  name: Diesel Heater
+  features:
+    - type: climate-hvac-modes
+      hvac_modes: [off, heat]
+
+- type: gauge
+  entity: sensor.rv_diesel_heater_helper_fuel_remaining_percent
+  name: Calibrated Diesel Fuel
+  needle: true
+  severity:
+    green: 50
+    yellow: 20
+    red: 0
+
+- type: entities
+  title: Fuel
+  show_header_toggle: false
+  entities:
+    - entity: sensor.rv_diesel_heater_helper_fuel_remaining
+      name: Fuel remaining
+    - entity: sensor.rv_diesel_heater_helper_fuel_rate
+      name: Current burn rate
+    - entity: sensor.rv_diesel_heater_helper_fuel_runtime_at_current_rate
+      name: Runtime at current rate
+    - entity: sensor.rv_diesel_heater_helper_fuel_runtime_at_maximum_rate
+      name: Runtime at maximum rate
+    - entity: sensor.afterburner_fuel_used
+      name: Raw controller fuel used (calibration)
+
+- type: entities
+  title: Fuel Cost
+  show_header_toggle: false
+  entities:
+    - entity: number.rv_diesel_heater_helper_diesel_price_per_litre
+      name: Diesel price
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_hour
+      name: Current cost per hour
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_24h_at_current_output
+      name: 24h at current output
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_30d_at_current_output
+      name: 30d at current output
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_hour_at_maximum_output
+      name: Maximum cost per hour
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_30d_at_maximum_output
+      name: 30d at maximum output
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_used_since_reset
+      name: Cost this tank interval
+    - entity: sensor.rv_diesel_heater_helper_fuel_cost_recorded_total
+      name: Recorded total cost
+    - entity: sensor.rv_diesel_heater_helper_fuel_value_remaining
+      name: Remaining fuel value
+    - entity: sensor.rv_diesel_heater_helper_full_tank_cost
+      name: Full tank cost
+
+- type: entities
+  title: Heater Status
+  show_header_toggle: false
+  entities:
+    - entity: sensor.afterburner_temperature_3
+      name: Room temperature
+    - entity: sensor.afterburner_desired
+      name: Requested temperature
+    - entity: sensor.afterburner_heater_temperature
+      name: Heat exchanger temperature
+    - entity: sensor.afterburner_run_state
+      name: Run state
+    - entity: sensor.afterburner_error_state
+      name: Controller status
+    - entity: sensor.afterburner_pump_speed
+      name: Pump frequency
+    - entity: sensor.afterburner_fan_speed
+      name: Fan speed
+    - entity: sensor.afterburner_input_voltage
+      name: Input voltage
+
+- type: entities
+  title: Automatic Control
+  show_header_toggle: false
+  entities:
+    - entity: sensor.rv_diesel_heater_helper_control_state
+      name: Controller state
+    - entity: sensor.rv_diesel_heater_helper_control_recommendation
+      name: Current action
+    - entity: sensor.rv_diesel_heater_helper_recovery_state
+      name: Recovery state
+    - entity: sensor.rv_diesel_heater_helper_flameout_warning
+      name: Flame stability
+
+- type: history-graph
+  title: Temperature History
+  hours_to_show: 24
+  entities:
+    - entity: sensor.afterburner_temperature_3
+      name: Room
+    - entity: sensor.afterburner_desired
+      name: Requested
+    - entity: sensor.afterburner_heater_temperature
+      name: Heat exchanger
+
+- type: history-graph
+  title: Fuel Demand History
+  hours_to_show: 24
+  entities:
+    - entity: sensor.afterburner_pump_speed
+      name: Pump frequency
+    - entity: sensor.rv_diesel_heater_helper_fuel_rate
+      name: Calculated burn rate

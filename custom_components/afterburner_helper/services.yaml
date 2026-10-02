@@ -1,0 +1,53 @@
+reset_fuel_usage:
+  name: Reset Fuel Usage
+  description: Reset the fuel usage counter on the Afterburner
+  target:
+    entity:
+      integration: afterburner_helper
+      domain: button
+
+prime_pump:
+  name: Prime Pump
+  description: Prime the fuel pump
+  target:
+    entity:
+      integration: afterburner_helper
+      domain: button
+
+adjust_temperature:
+  name: Adjust Temperature
+  description: Adjust temperature by a specific amount
+  target:
+    entity:
+      integration: afterburner_helper
+      domain: climate
+  fields:
+    delta:
+      name: Temperature Delta
+      description: Amount to adjust (positive or negative)
+      required: true
+      selector:
+        number:
+          min: -10
+          max: 10
+          step: 0.5
+          unit_of_measurement: "°C"
+
+set_temperature:
+  name: Set Temperature
+  description: Set the target temperature
+  target:
+    entity:
+      integration: afterburner_helper
+      domain: climate
+  fields:
+    temperature:
+      name: Target Temperature
+      description: Desired temperature in Celsius
+      required: true
+      selector:
+        number:
+          min: 5
+          max: 35
+          step: 0.5
+          unit_of_measurement: "°C"
