@@ -17,15 +17,20 @@ from .const import (
     CONF_CLIMATE_ENTITY_ID,
     CONF_ELECTRIC_HEATER_1_ENTITY_ID,
     CONF_ELECTRIC_HEATER_2_ENTITY_ID,
+    CONF_FUSED_TEMPERATURE_ENTITIES,
     CONF_ROOM_TEMPERATURE_ENTITY_ID,
+    CONF_USE_FUSED_TEMPERATURE,
     DEFAULT_CLIMATE_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
+    DEFAULT_FUSED_TEMPERATURE_ENTITIES,
     DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
+    DEFAULT_USE_FUSED_TEMPERATURE,
     HEAT_SOURCES,
     PRIORITY_OPTIONS,
 )
 from .heat_logic import requested_sources
+from .temperature import fused_temperature
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +50,22 @@ class HeatGroupManager:
         self.entry = entry
         options = {**entry.data, **entry.options}
         self.room_entity = options.get(CONF_ROOM_TEMPERATURE_ENTITY_ID, DEFAULT_ROOM_TEMPERATURE_ENTITY_ID)
+        self.use_fused_temperature = bool(
+            options.get(CONF_USE_FUSED_TEMPERATURE, DEFAULT_USE_FUSED_TEMPERATURE)
+        )
+        configured_sources = options.get(
+            CONF_FUSED_TEMPERATURE_ENTITIES,
+            DEFAULT_FUSED_TEMPERATURE_ENTITIES,
+        )
+        if isinstance(configured_sources, str):
+            configured_sources = [configured_sources]
+        self.fused_temperature_entities = tuple(
+            dict.fromkeys(
+                entity_id
+                for entity_id in configured_sources
+                if isinstance(entity_id, str) and entity_id
+            )
+        )
         self.diesel_entity = options.get(CONF_CLIMATE_ENTITY_ID, DEFAULT_CLIMATE_ENTITY_ID)
         self.electric_entities = {
             "electric_1": options.get(CONF_ELECTRIC_HEATER_1_ENTITY_ID, DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID),
@@ -88,9 +109,13 @@ class HeatGroupManager:
         self.lockouts.update(saved.get("lockouts", {}))
         self.member_modes.update(saved.get("member_modes", {}))
         self.member_targets.update(saved.get("member_targets", {}))
-        watched = [self.room_entity, self.diesel_entity]
+        watched = [self.room_entity, self.diesel_entity, *self.fused_temperature_entities]
         watched.extend(entity for entity in self.electric_entities.values() if entity)
-        self._unsub = async_track_state_change_event(hass=self.hass, entity_ids=watched, action=self._state_changed)
+        self._unsub = async_track_state_change_event(
+            hass=self.hass,
+            entity_ids=list(dict.fromkeys(watched)),
+            action=self._state_changed,
+        )
         if saved:
             await self.async_reconcile()
         else:
@@ -126,11 +151,31 @@ class HeatGroupManager:
 
     @property
     def room_temperature(self) -> float | None:
+        if self.use_fused_temperature:
+            return self.fused_temperature
         state = self.hass.states.get(self.room_entity)
         try:
             return float(state.state) if state else None
         except (TypeError, ValueError):
             return None
+
+    @property
+    def fused_temperature(self) -> float | None:
+        """Average every currently valid configured temperature source."""
+        return fused_temperature(self.fused_temperature_values.values())
+
+    @property
+    def fused_temperature_values(self) -> dict[str, float]:
+        """Return valid source values keyed by entity ID."""
+        values: dict[str, float] = {}
+        for entity_id in self.fused_temperature_entities:
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in {STATE_UNAVAILABLE, STATE_UNKNOWN}:
+                continue
+            value = fused_temperature((state.state,))
+            if value is not None:
+                values[entity_id] = value
+        return values
 
     def snapshot(self) -> StageSnapshot:
         requested = self._requested_sources()
@@ -213,6 +258,12 @@ class HeatGroupManager:
 
     async def async_set_target(self, temperature: float) -> None:
         self.target_temperature = temperature
+        # The master thermostat is the group's demand control. Keep every
+        # member's target aligned whenever it changes; member modes and
+        # lockouts remain independent, and a member can still be adjusted
+        # manually afterward.
+        for source in HEAT_SOURCES:
+            self.member_targets[source] = temperature
         await self._changed()
 
     async def async_set_priority(self, priority: str) -> None:

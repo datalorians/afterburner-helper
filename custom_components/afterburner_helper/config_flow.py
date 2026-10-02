@@ -15,11 +15,13 @@ from .const import (
     CONF_DIESEL_PRICE_PER_LITRE,
     CONF_ELECTRIC_HEATER_1_ENTITY_ID,
     CONF_ELECTRIC_HEATER_2_ENTITY_ID,
+    CONF_FUSED_TEMPERATURE_ENTITIES,
     CONF_LOWER_OFFSET_C,
     CONF_MAXIMUM_PUMP_HZ,
     CONF_MINIMUM_PUMP_HZ,
     CONF_MQTT_TOPIC_PREFIX,
     CONF_ROOM_TEMPERATURE_ENTITY_ID,
+    CONF_USE_FUSED_TEMPERATURE,
     CONF_PUMP_ML_PER_STROKE,
     CONF_EARLY_RECOVERY_ENABLED,
     CONF_RECOVERY_MIN_RISE_C,
@@ -35,12 +37,14 @@ from .const import (
     DEFAULT_DIESEL_PRICE_PER_LITRE,
     DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
+    DEFAULT_FUSED_TEMPERATURE_ENTITIES,
     DEFAULT_CLIMATE_ENTITY_ID,
     DEFAULT_LOWER_OFFSET_C,
     DEFAULT_MAXIMUM_PUMP_HZ,
     DEFAULT_MINIMUM_PUMP_HZ,
     DEFAULT_MQTT_TOPIC_PREFIX,
     DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
+    DEFAULT_USE_FUSED_TEMPERATURE,
     DEFAULT_PUMP_ML_PER_STROKE,
     DEFAULT_RECOVERY_MIN_RISE_C,
     DEFAULT_RECOVERY_SETPOINT_C,
@@ -160,6 +164,22 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 ),
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor")
+            ),
+            vol.Required(
+                CONF_USE_FUSED_TEMPERATURE,
+                default=defaults.get(
+                    CONF_USE_FUSED_TEMPERATURE,
+                    DEFAULT_USE_FUSED_TEMPERATURE,
+                ),
+            ): bool,
+            vol.Required(
+                CONF_FUSED_TEMPERATURE_ENTITIES,
+                default=defaults.get(
+                    CONF_FUSED_TEMPERATURE_ENTITIES,
+                    list(DEFAULT_FUSED_TEMPERATURE_ENTITIES),
+                ),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor", multiple=True)
             ),
             vol.Optional(
                 CONF_ELECTRIC_HEATER_1_ENTITY_ID,

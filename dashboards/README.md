@@ -3,6 +3,9 @@
 `climate-control.yaml` is the complete multi-page Home Assistant dashboard for
 Afterburner Helper. It provides a simple climate landing page plus detailed
 diesel-heater, thermostat, frost, fuel/mixture, timer, GPIO, and system pages.
+It also displays the virtual fused room temperature. Configure its source
+sensors and choose between fused or single-sensor control from the Afterburner
+Helper integration options.
 
 Home Assistant does not provide a supported custom-integration API for silently
 rewriting a user's dashboard registry or `configuration.yaml`. Consequently the

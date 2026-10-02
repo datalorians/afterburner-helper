@@ -8,7 +8,13 @@ from typing import Any
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, UnitOfTime, UnitOfVolume, UnitOfVolumeFlowRate
+from homeassistant.const import (
+    PERCENTAGE,
+    UnitOfTemperature,
+    UnitOfTime,
+    UnitOfVolume,
+    UnitOfVolumeFlowRate,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -16,6 +22,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_DEVICE_NAME, CONF_MQTT_TOPIC_PREFIX, DEFAULT_DEVICE_NAME, DOMAIN
 from .coordinator import AfterburnerCoordinator, AfterburnerData
+from .staging import HeatGroupManager
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -198,9 +205,12 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     coordinator: AfterburnerCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities(
-        AfterburnerSensor(coordinator, entry, description) for description in DESCRIPTIONS
-    )
+    entities: list[SensorEntity] = [
+        AfterburnerSensor(coordinator, entry, description)
+        for description in DESCRIPTIONS
+    ]
+    entities.append(FusedRoomTemperatureSensor(entry, coordinator.heat_group))
+    async_add_entities(entities)
 
 
 class AfterburnerSensor(CoordinatorEntity[AfterburnerCoordinator], SensorEntity):
@@ -267,3 +277,54 @@ class AfterburnerSensor(CoordinatorEntity[AfterburnerCoordinator], SensorEntity)
                 ),
             }
         return None
+
+
+class FusedRoomTemperatureSensor(SensorEntity):
+    """Virtual room temperature formed from configured HA sensors."""
+
+    _attr_has_entity_name = True
+    _attr_name = "Fused room temperature"
+    _attr_icon = "mdi:thermometer-lines"
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+
+    def __init__(self, entry: ConfigEntry, manager: HeatGroupManager) -> None:
+        self.manager = manager
+        self._attr_unique_id = f"{entry.entry_id}_fused_room_temperature"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"{entry.entry_id}_heat_group")},
+            name="Climate Control",
+            manufacturer="Afterburner Helper",
+            model="Staged Heat Group",
+        )
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self.manager.async_add_listener(self._updated))
+
+    def _updated(self) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def available(self) -> bool:
+        return self.manager.fused_temperature is not None
+
+    @property
+    def native_value(self) -> float | None:
+        return self.manager.fused_temperature
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        values = self.manager.fused_temperature_values
+        return {
+            "method": "arithmetic_mean",
+            "used_by_master_climate": self.manager.use_fused_temperature,
+            "configured_sources": list(self.manager.fused_temperature_entities),
+            "active_sources": values,
+            "unavailable_sources": [
+                entity_id
+                for entity_id in self.manager.fused_temperature_entities
+                if entity_id not in values
+            ],
+            "active_source_count": len(values),
+        }

@@ -89,7 +89,7 @@ the fuel pump and does not bypass the stock ECU shutdown sequence.
 
 ## Staged diesel and electric heat
 
-Version 2.4 adds one master climate control for the complete heating group and
+Version 2.5 provides one master climate control for the complete heating group and
 member climate controls for diesel plus two optional smart-plug heaters.
 
 - Choose any of the six diesel / Electric 1 / Electric 2 priority orders.
@@ -97,6 +97,14 @@ member climate controls for diesel plus two optional smart-plug heaters.
 - Leave a member in **Auto** to follow the master demand.
 - Set a member to **Heat** or **Off** for a persistent manual override.
 - Assign both electric-heater switch entities in the integration options.
+- Propagate every master setpoint change to all three member thermostats.
+
+The master can use either one selected room-temperature sensor or a virtual
+fused temperature. The fused sensor accepts any number of Home Assistant
+temperature entities, averages every currently available value, and exposes
+the contributing and unavailable sensors as attributes. The default fusion
+combines the Afterburner room sensor with
+`sensor.igneous_bedroom_temperature_ds18b20_2`.
 
 Automatic staging calls the first available source at 0.3 °C below demand, the
 second at 1.5 °C below demand, and the third at 3.0 °C below demand. Locked-out

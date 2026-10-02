@@ -40,6 +40,8 @@ CONF_RECOVERY_MIN_RISE_C = "recovery_minimum_rise_c"
 CONF_CLIMATE_ENTITY_ID = "climate_entity_id"
 CONF_DIESEL_PRICE_PER_LITRE = "diesel_price_per_litre"
 CONF_ROOM_TEMPERATURE_ENTITY_ID = "room_temperature_entity_id"
+CONF_USE_FUSED_TEMPERATURE = "use_fused_temperature"
+CONF_FUSED_TEMPERATURE_ENTITIES = "fused_temperature_entities"
 CONF_ELECTRIC_HEATER_1_ENTITY_ID = "electric_heater_1_entity_id"
 CONF_ELECTRIC_HEATER_2_ENTITY_ID = "electric_heater_2_entity_id"
 
@@ -60,6 +62,11 @@ DEFAULT_RECOVERY_TIMEOUT_S = 120.0
 DEFAULT_RECOVERY_MIN_RISE_C = 5.0
 DEFAULT_DIESEL_PRICE_PER_LITRE = 0.0
 DEFAULT_ROOM_TEMPERATURE_ENTITY_ID = "sensor.afterburner_temperature_3"
+DEFAULT_USE_FUSED_TEMPERATURE = True
+DEFAULT_FUSED_TEMPERATURE_ENTITIES = (
+    "sensor.afterburner_temperature_3",
+    "sensor.igneous_bedroom_temperature_ds18b20_2",
+)
 DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID = "switch.s31_3_sonoff_s31_relay"
 DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID = ""
 

@@ -17,6 +17,8 @@ views:
         title: Heat Staging
         show_header_toggle: false
         entities:
+          - entity: sensor.climate_control_fused_room_temperature
+            name: Fused room temperature
           - entity: select.climate_control_afterburner_heat_source_priority
             name: Demand order
           - entity: switch.climate_control_afterburner_electric_heater_1_lockout
@@ -158,8 +160,12 @@ views:
         title: Temperature History
         hours_to_show: 24
         entities:
+          - entity: sensor.climate_control_fused_room_temperature
+            name: Fused room
+          - entity: sensor.igneous_bedroom_temperature_ds18b20_2
+            name: Bedroom
           - entity: sensor.afterburner_temperature_3
-            name: Room
+            name: Heater room
           - entity: sensor.afterburner_desired
             name: Requested
           - entity: sensor.afterburner_heater_temperature
@@ -199,6 +205,23 @@ views:
           Smart-plug targets are selected under Settings → Devices & services →
           Afterburner Helper → Configure. Electric Heater 1 defaults to
           switch.s31_3_sonoff_s31_relay; Electric Heater 2 is optional.
+      - type: entities
+        title: Room Temperature Fusion
+        show_header_toggle: false
+        entities:
+          - entity: sensor.climate_control_fused_room_temperature
+            name: Fused room temperature
+          - entity: sensor.afterburner_temperature_3
+            name: Heater room sensor
+          - entity: sensor.igneous_bedroom_temperature_ds18b20_2
+            name: Bedroom sensor
+      - type: markdown
+        title: Temperature Sensor Assignment
+        content: >-
+          Choose any number of temperature sensors under Settings → Devices &
+          services → Afterburner Helper → Configure. Enable “Use fused
+          temperature” to drive the main climate control from their average,
+          or disable it to use the selected single room-temperature sensor.
 
   - title: Thermostat & Cyclic
     path: thermostat-cyclic
