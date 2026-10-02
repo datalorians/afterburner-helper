@@ -106,6 +106,19 @@ the contributing and unavailable sensors as attributes. The default fusion
 combines the Afterburner room sensor with
 `sensor.igneous_bedroom_temperature_ds18b20_2`.
 
+Version 2.6 adds a configurable outdoor reference (defaulting to
+`sensor.spare_temperature`), indoor/outdoor and demand/outdoor deltas, and a
+dashboard explanation of every fused input and the live arithmetic. These
+measurements are ordinary Recorder-compatible sensors for later heat-loss and
+weather analysis.
+
+The MQTT settings layer now also exposes cyclic and frost thresholds,
+low-voltage cutout, controller/fan type, GPIO states/user outputs/thresholds,
+altitude and humidity, firmware/runtime diagnostics, and the controller's
+two-step authenticated reboot command. See
+[`docs/development-status.md`](docs/development-status.md) for the firmware
+boundary and remaining timer/console work.
+
 Automatic staging calls the first available source at 0.3 °C below demand, the
 second at 1.5 °C below demand, and the third at 3.0 °C below demand. Locked-out
 or manually disabled sources are skipped and the next available source fills

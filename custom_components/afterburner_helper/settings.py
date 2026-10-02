@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import asyncio
 from collections.abc import Callable
 from typing import Any
 
@@ -84,3 +85,38 @@ class AfterburnerSettingsHub:
                 qos=0,
                 retain=False,
             )
+
+    async def async_reboot(self) -> None:
+        """Complete Afterburner's two-step reboot challenge over MQTT."""
+        self.values.pop("Reboot", None)
+        challenge_received = asyncio.Event()
+
+        @callback
+        def challenge_listener() -> None:
+            try:
+                challenge = int(self.values.get("Reboot", 0))
+            except (TypeError, ValueError):
+                return
+            if challenge > 0:
+                challenge_received.set()
+
+        remove_listener = self.async_add_listener(challenge_listener)
+        try:
+            await mqtt.async_publish(
+                self.hass,
+                f"{self.topic_prefix}/cmd/Reboot",
+                "0",
+                qos=0,
+                retain=False,
+            )
+            await asyncio.wait_for(challenge_received.wait(), timeout=10)
+            challenge = int(self.values["Reboot"])
+            await mqtt.async_publish(
+                self.hass,
+                f"{self.topic_prefix}/cmd/Reboot",
+                str(challenge),
+                qos=0,
+                retain=False,
+            )
+        finally:
+            remove_listener()

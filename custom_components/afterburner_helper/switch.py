@@ -6,7 +6,7 @@ from typing import Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
@@ -31,6 +31,9 @@ async def async_setup_entry(
         HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "diesel", "Afterburner Diesel Lockout"),
         HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "electric_1", "Afterburner Electric Heater 1 Lockout"),
         HeatSourceLockoutSwitch(config_entry, coordinator.heat_group, "electric_2", "Afterburner Electric Heater 2 Lockout"),
+        AfterburnerCommandSwitch(config_entry, coordinator.settings_hub, "Thermostat", "Thermostat enable", "mdi:thermostat"),
+        AfterburnerCommandSwitch(config_entry, coordinator.settings_hub, "GPout1", "GPIO output 1", "mdi:electric-switch"),
+        AfterburnerCommandSwitch(config_entry, coordinator.settings_hub, "GPout2", "GPIO output 2", "mdi:electric-switch"),
     ])
 
 
@@ -61,6 +64,49 @@ class HeatSourceLockoutSwitch(SwitchEntity):
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.manager.async_set_lockout(self.source, False)
+
+
+class AfterburnerCommandSwitch(SwitchEntity):
+    """Live controller switch backed by JSONout and an MQTT command."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, entry, hub, key: str, name: str, icon: str) -> None:
+        self.hub = hub
+        self.key = key
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_unique_id = f"{hub.topic_prefix}_command_switch_{key.lower()}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, hub.topic_prefix)},
+            name=entry.title,
+            manufacturer="Afterburner",
+            model="Diesel Heater Controller",
+        )
+
+    async def async_added_to_hass(self) -> None:
+        self.async_on_remove(self.hub.async_add_listener(self._updated))
+
+    @property
+    def available(self) -> bool:
+        return self.key in self.hub.values
+
+    @property
+    def is_on(self) -> bool:
+        try:
+            return bool(int(float(self.hub.values.get(self.key, 0))))
+        except (TypeError, ValueError):
+            return False
+
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        await self.hub.async_publish(self.key, 1, save=False)
+
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        await self.hub.async_publish(self.key, 0, save=False)
+
+    @callback
+    def _updated(self) -> None:
+        self.async_write_ha_state()
 
 
 class AfterburnerFlameoutRecoverySwitch(SwitchEntity):

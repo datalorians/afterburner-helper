@@ -16,6 +16,7 @@ from .const import (
     CONF_ELECTRIC_HEATER_1_ENTITY_ID,
     CONF_ELECTRIC_HEATER_2_ENTITY_ID,
     CONF_FUSED_TEMPERATURE_ENTITIES,
+    CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
     CONF_LOWER_OFFSET_C,
     CONF_MAXIMUM_PUMP_HZ,
     CONF_MINIMUM_PUMP_HZ,
@@ -38,6 +39,7 @@ from .const import (
     DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
     DEFAULT_FUSED_TEMPERATURE_ENTITIES,
+    DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
     DEFAULT_CLIMATE_ENTITY_ID,
     DEFAULT_LOWER_OFFSET_C,
     DEFAULT_MAXIMUM_PUMP_HZ,
@@ -180,6 +182,15 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 ),
             ): selector.EntitySelector(
                 selector.EntitySelectorConfig(domain="sensor", multiple=True)
+            ),
+            vol.Required(
+                CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
+                default=defaults.get(
+                    CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
+                    DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
+                ),
+            ): selector.EntitySelector(
+                selector.EntitySelectorConfig(domain="sensor")
             ),
             vol.Optional(
                 CONF_ELECTRIC_HEATER_1_ENTITY_ID,

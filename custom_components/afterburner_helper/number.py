@@ -31,6 +31,7 @@ class SettingDescription:
     step: float
     unit: str | None = None
     icon: str | None = None
+    state_key: str | None = None
 
 
 SETTING_DESCRIPTIONS = (
@@ -44,6 +45,15 @@ SETTING_DESCRIPTIONS = (
     SettingDescription(key="Temp2Offset", name="Temperature 2 offset", minimum=-10.0, maximum=10.0, step=0.1, unit="°C", icon="mdi:thermometer-alert"),
     SettingDescription(key="Temp3Offset", name="Temperature 3 offset", minimum=-10.0, maximum=10.0, step=0.1, unit="°C", icon="mdi:thermometer-alert"),
     SettingDescription(key="Temp4Offset", name="Temperature 4 offset", minimum=-10.0, maximum=10.0, step=0.1, unit="°C", icon="mdi:thermometer-alert"),
+    SettingDescription(key="CyclicTemp", name="Cyclic pivot temperature", minimum=5.0, maximum=35.0, step=1.0, unit="°C", icon="mdi:thermostat"),
+    SettingDescription(key="CyclicOn", name="Cyclic start offset", minimum=-20.0, maximum=0.0, step=1.0, unit="°C", icon="mdi:thermometer-chevron-down"),
+    SettingDescription(key="CyclicOff", name="Cyclic stop offset", minimum=0.0, maximum=10.0, step=1.0, unit="°C", icon="mdi:thermometer-chevron-up"),
+    SettingDescription(key="FrostOn", name="Frost start temperature", minimum=0.0, maximum=30.0, step=1.0, unit="°C", icon="mdi:snowflake-thermometer"),
+    SettingDescription(key="FrostRise", name="Frost temperature rise", minimum=0.0, maximum=30.0, step=1.0, unit="°C", icon="mdi:thermometer-plus"),
+    SettingDescription(key="LowVoltCutout", name="Low-voltage cutout", minimum=0.0, maximum=25.0, step=0.1, unit="V", icon="mdi:car-battery"),
+    SettingDescription(key="ExtThermoTmout", name="External thermostat timeout", minimum=0, maximum=3600000, step=1000, unit="ms", icon="mdi:timer-cog-outline"),
+    SettingDescription(key="GPOutThr1", state_key="GPoutThr1", name="GPIO output 1 threshold", minimum=-50, maximum=50, step=1, icon="mdi:tune-vertical"),
+    SettingDescription(key="GPOutThr2", state_key="GPoutThr2", name="GPIO output 2 threshold", minimum=-50, maximum=50, step=1, icon="mdi:tune-vertical"),
 )
 
 
@@ -89,11 +99,11 @@ class AfterburnerSettingNumber(NumberEntity):
 
     @property
     def available(self) -> bool:
-        return self.description.key in self.hub.values
+        return (self.description.state_key or self.description.key) in self.hub.values
 
     @property
     def native_value(self) -> float | None:
-        value = self.hub.values.get(self.description.key)
+        value = self.hub.values.get(self.description.state_key or self.description.key)
         try:
             return float(value) if value is not None else None
         except (TypeError, ValueError):

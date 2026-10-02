@@ -13,6 +13,37 @@ views:
             hvac_modes:
               - "off"
               - heat
+      - type: markdown
+        title: Temperature Model
+        content: >-
+          {% set values = state_attr('sensor.climate_control_fused_room_temperature', 'active_sources') or {} %}
+          **Sensors used now**
+
+          {% for entity_id, value in values.items() %}
+          - `{{ entity_id }}`: **{{ value }} °C**
+          {% endfor %}
+
+          **Calculation:** {{ state_attr('sensor.climate_control_fused_room_temperature', 'calculation') }}
+
+          **Virtual room temperature:** {{ states('sensor.climate_control_fused_room_temperature') }} °C
+
+          **Outdoor reference:** {{ states('sensor.climate_control_outdoor_temperature_reference') }} °C
+
+          **Demand − outdoor:** {{ states('sensor.climate_control_outdoor_to_demand_delta') }} °C
+
+          **Indoor − outdoor:** {{ states('sensor.climate_control_indoor_to_outdoor_delta') }} °C
+      - type: entities
+        title: Temperature References
+        show_header_toggle: false
+        entities:
+          - entity: sensor.climate_control_fused_room_temperature
+            name: Virtual fused room temperature
+          - entity: sensor.climate_control_outdoor_temperature_reference
+            name: Outdoor reference
+          - entity: sensor.climate_control_outdoor_to_demand_delta
+            name: Demand minus outdoor
+          - entity: sensor.climate_control_indoor_to_outdoor_delta
+            name: Indoor minus outdoor
       - type: entities
         title: Heat Staging
         show_header_toggle: false
@@ -170,6 +201,8 @@ views:
             name: Requested
           - entity: sensor.afterburner_heater_temperature
             name: Heat exchanger
+          - entity: sensor.climate_control_outdoor_temperature_reference
+            name: Outdoor
       - type: history-graph
         title: Fuel Demand History
         hours_to_show: 24
@@ -234,30 +267,24 @@ views:
         entities:
           - entity: switch.afterburner_thermostat_enable
             name: Thermostat enabled
-          - entity: select.afterburner_thermostat_mode
-            name: Thermostat mode
-          - entity: sensor.afterburner_temperature_3
-            name: Room temperature
+          - entity: select.afterburner_thermostat_control_method
+            name: Controller thermostat method
+          - entity: sensor.climate_control_fused_room_temperature
+            name: Fused room temperature
           - entity: sensor.afterburner_desired
             name: Temperature demand
-          - entity: number.afterburner_set_power_demand
-            name: Fixed power demand
           - entity: number.afterburner_thermostat_window
             name: Thermostat window
       - type: entities
         title: Cyclic Start / Stop
         show_header_toggle: false
         entities:
-          - entity: switch.afterburner_cyclic_enable
-            name: Cyclic control enabled
-          - entity: number.afterburner_cyclic_on_offset
+          - entity: number.afterburner_cyclic_start_offset
             name: Start offset
-          - entity: number.afterburner_cyclic_off_offset
+          - entity: number.afterburner_cyclic_stop_offset
             name: Stop offset
-          - entity: number.afterburner_cyclic_restart_temperature
-            name: Calculated restart temperature
-          - entity: number.afterburner_cyclic_stop_temperature
-            name: Calculated stop temperature
+          - entity: number.afterburner_cyclic_pivot_temperature
+            name: Pivot temperature
           - entity: binary_sensor.afterburner_run_request
             name: Run request
       - type: history-graph
@@ -280,20 +307,10 @@ views:
         title: Frost Mode
         show_header_toggle: false
         entities:
-          - entity: switch.afterburner_frost_enable
-            name: Frost protection enabled
-          - entity: select.afterburner_frost_mode
-            name: Frost mode
           - entity: number.afterburner_frost_start_temperature
-            name: Start temperature
-          - entity: number.afterburner_frost_target_temperature
-            name: Target temperature
-          - entity: sensor.afterburner_frost_rise
-            name: Configured temperature rise
-          - entity: binary_sensor.afterburner_frost_active
-            name: Frost cycle active
-          - entity: binary_sensor.afterburner_frost_hold
-            name: Frost hold
+            name: Start temperature (0 disables)
+          - entity: number.afterburner_frost_temperature_rise
+            name: Temperature rise before stopping
 
   - title: Fuel & Mixture
     path: fuel-mixture
@@ -350,6 +367,13 @@ views:
           The active map is now editable and saved persistently through MQTT.
           The four altitude-indexed alternate maps still require additional
           firmware command support and will be added here when available.
+      - type: entities
+        title: Controller Hardware Calibration
+        show_header_toggle: false
+        entities:
+          - entity: select.afterburner_fan_sensor_type
+          - entity: select.afterburner_system_voltage
+          - entity: number.afterburner_low_voltage_cutout
 
   - title: Timers
     path: timers
@@ -373,26 +397,31 @@ views:
         title: Inputs
         show_header_toggle: false
         entities:
-          - entity: binary_sensor.afterburner_gp_in_1_disabled
-            name: GPIO input 1
-          - entity: binary_sensor.afterburner_gp_in_2_disabled
-            name: GPIO input 2
-          - entity: sensor.afterburner_analogue_input
+          - entity: sensor.afterburner_gpio_input_1
+          - entity: sensor.afterburner_gpio_input_1_mode
+          - entity: sensor.afterburner_gpio_input_2
+          - entity: sensor.afterburner_gpio_input_2_mode
+          - entity: sensor.afterburner_gpio_analog_input
             name: Analogue input
+          - entity: sensor.afterburner_gpio_analog_mode
       - type: entities
         title: User Outputs
         show_header_toggle: false
         entities:
-          - entity: switch.afterburner_gp_out_1_user
+          - entity: switch.afterburner_gpio_output_1
             name: GPIO output 1
-          - entity: switch.afterburner_gp_out_2_user
+          - entity: sensor.afterburner_gpio_output_1_mode
+          - entity: number.afterburner_gpio_output_1_threshold
+          - entity: switch.afterburner_gpio_output_2
             name: GPIO output 2
+          - entity: sensor.afterburner_gpio_output_2_mode
+          - entity: number.afterburner_gpio_output_2_threshold
       - type: markdown
         title: GPIO Configuration
         content: >-
-          Input and output mode configuration, thresholds, inversion, servo drive,
-          fuel-sender calibration, and pulse counting will be added here as the
-          helper gains persistent Afterburner setting commands.
+          Live GPIO states, user outputs, modes, analogue input, and output
+          thresholds now come directly from Afterburner MQTT. Firmware does not
+          currently expose MQTT commands for changing the pin modes themselves.
 
   - title: System
     path: system
@@ -413,8 +442,12 @@ views:
             name: Glow plug voltage
           - entity: sensor.afterburner_glow_plug_current
             name: Glow plug current
-          - entity: sensor.afterburner_altitude
+          - entity: sensor.afterburner_controller_altitude
             name: Reported altitude
+          - entity: sensor.afterburner_controller_humidity
+          - entity: sensor.afterburner_fan_voltage
+          - entity: sensor.afterburner_configured_system_voltage
+          - entity: sensor.afterburner_blue_wire_status
           - entity: sensor.afterburner_heater_temperature
             name: Heat exchanger temperature
       - type: entities
@@ -433,11 +466,23 @@ views:
         entities:
           - entity: button.afterburner_prime_pump
             name: Prime fuel pump
+          - entity: button.afterburner_refresh_system_information
+            name: Refresh system information
+          - entity: button.afterburner_reboot_controller
+            name: Reboot Afterburner controller
+      - type: entities
+        title: Firmware and Runtime
+        show_header_toggle: false
+        entities:
+          - entity: sensor.afterburner_controller_firmware_version
+          - entity: sensor.afterburner_controller_firmware_date
+          - entity: sensor.afterburner_controller_uptime
+          - entity: sensor.afterburner_controller_free_memory
+          - entity: sensor.afterburner_heater_accumulated_runtime
+          - entity: sensor.afterburner_glow_plug_accumulated_runtime
       - type: markdown
         title: Remaining System Settings
         content: >-
-          Voltage calibration and cutout, pump calibration, altitude compensation,
-          environmental sensor offsets, system clock, reboot, firmware update,
-          communications, logging, and the virtual console are mapped for future
-          helper support. Network credentials will not be displayed on this
-          dashboard.
+          Firmware update, timer editing, GPIO mode assignment, communications,
+          log streaming, and the virtual console remain future work. Network
+          credentials will not be displayed on this dashboard.

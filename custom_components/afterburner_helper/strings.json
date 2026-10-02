@@ -39,6 +39,7 @@
           "room_temperature_entity_id": "Shared room-temperature sensor",
           "use_fused_temperature": "Use fused temperature for the master climate control",
           "fused_temperature_entities": "Temperature sensors to fuse",
+          "outdoor_temperature_entity_id": "Outdoor reference temperature sensor",
           "electric_heater_1_entity_id": "Electric Heater 1 smart-plug switch",
           "electric_heater_2_entity_id": "Electric Heater 2 smart-plug switch (optional)"
         }

@@ -42,6 +42,7 @@ CONF_DIESEL_PRICE_PER_LITRE = "diesel_price_per_litre"
 CONF_ROOM_TEMPERATURE_ENTITY_ID = "room_temperature_entity_id"
 CONF_USE_FUSED_TEMPERATURE = "use_fused_temperature"
 CONF_FUSED_TEMPERATURE_ENTITIES = "fused_temperature_entities"
+CONF_OUTDOOR_TEMPERATURE_ENTITY_ID = "outdoor_temperature_entity_id"
 CONF_ELECTRIC_HEATER_1_ENTITY_ID = "electric_heater_1_entity_id"
 CONF_ELECTRIC_HEATER_2_ENTITY_ID = "electric_heater_2_entity_id"
 
@@ -67,6 +68,7 @@ DEFAULT_FUSED_TEMPERATURE_ENTITIES = (
     "sensor.afterburner_temperature_3",
     "sensor.igneous_bedroom_temperature_ds18b20_2",
 )
+DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID = "sensor.spare_temperature"
 DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID = "switch.s31_3_sonoff_s31_relay"
 DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID = ""
 

@@ -18,12 +18,14 @@ from .const import (
     CONF_ELECTRIC_HEATER_1_ENTITY_ID,
     CONF_ELECTRIC_HEATER_2_ENTITY_ID,
     CONF_FUSED_TEMPERATURE_ENTITIES,
+    CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
     CONF_ROOM_TEMPERATURE_ENTITY_ID,
     CONF_USE_FUSED_TEMPERATURE,
     DEFAULT_CLIMATE_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
     DEFAULT_FUSED_TEMPERATURE_ENTITIES,
+    DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
     DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
     DEFAULT_USE_FUSED_TEMPERATURE,
     HEAT_SOURCES,
@@ -65,6 +67,10 @@ class HeatGroupManager:
                 for entity_id in configured_sources
                 if isinstance(entity_id, str) and entity_id
             )
+        )
+        self.outdoor_temperature_entity = options.get(
+            CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
+            DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
         )
         self.diesel_entity = options.get(CONF_CLIMATE_ENTITY_ID, DEFAULT_CLIMATE_ENTITY_ID)
         self.electric_entities = {
@@ -109,7 +115,12 @@ class HeatGroupManager:
         self.lockouts.update(saved.get("lockouts", {}))
         self.member_modes.update(saved.get("member_modes", {}))
         self.member_targets.update(saved.get("member_targets", {}))
-        watched = [self.room_entity, self.diesel_entity, *self.fused_temperature_entities]
+        watched = [
+            self.room_entity,
+            self.diesel_entity,
+            self.outdoor_temperature_entity,
+            *self.fused_temperature_entities,
+        ]
         watched.extend(entity for entity in self.electric_entities.values() if entity)
         self._unsub = async_track_state_change_event(
             hass=self.hass,
@@ -176,6 +187,28 @@ class HeatGroupManager:
             if value is not None:
                 values[entity_id] = value
         return values
+
+    @property
+    def outdoor_temperature(self) -> float | None:
+        """Return the configured outdoor reference temperature."""
+        state = self.hass.states.get(self.outdoor_temperature_entity)
+        if state is None or state.state in {STATE_UNAVAILABLE, STATE_UNKNOWN}:
+            return None
+        return fused_temperature((state.state,))
+
+    @property
+    def outdoor_demand_delta(self) -> float | None:
+        """Return demand minus outdoor temperature."""
+        if self.outdoor_temperature is None:
+            return None
+        return round(self.target_temperature - self.outdoor_temperature, 2)
+
+    @property
+    def indoor_outdoor_delta(self) -> float | None:
+        """Return controlled indoor temperature minus outdoor temperature."""
+        if self.room_temperature is None or self.outdoor_temperature is None:
+            return None
+        return round(self.room_temperature - self.outdoor_temperature, 2)
 
     def snapshot(self) -> StageSnapshot:
         requested = self._requested_sources()

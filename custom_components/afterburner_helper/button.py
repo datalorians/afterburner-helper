@@ -33,6 +33,8 @@ async def async_setup_entry(
         AfterburnerTestOnButton(topic_prefix, device_name),
         AfterburnerTestOffButton(topic_prefix, device_name),
         AfterburnerRefreshSettingsButton(coordinator, device_name),
+        AfterburnerSystemInfoButton(coordinator, device_name),
+        AfterburnerRebootButton(coordinator, device_name),
     ])
 
 
@@ -58,6 +60,34 @@ class AfterburnerRefreshSettingsButton(ButtonEntity):
 
     async def async_press(self) -> None:
         await self.coordinator.settings_hub.async_publish("Refresh", 1, save=False)
+
+
+class AfterburnerSystemInfoButton(AfterburnerRefreshSettingsButton):
+    """Ask the controller to publish firmware and runtime diagnostics."""
+
+    _attr_icon = "mdi:information-outline"
+
+    def __init__(self, coordinator: AfterburnerCoordinator, device_name: str) -> None:
+        super().__init__(coordinator, device_name)
+        self._attr_name = f"{device_name} Refresh System Information"
+        self._attr_unique_id = f"{coordinator.settings_hub.topic_prefix}_refresh_system_information"
+
+    async def async_press(self) -> None:
+        await self.coordinator.settings_hub.async_publish("SQuery", 1, save=False)
+
+
+class AfterburnerRebootButton(AfterburnerRefreshSettingsButton):
+    """Reboot the Afterburner controller using its challenge handshake."""
+
+    _attr_icon = "mdi:restart"
+
+    def __init__(self, coordinator: AfterburnerCoordinator, device_name: str) -> None:
+        super().__init__(coordinator, device_name)
+        self._attr_name = f"{device_name} Reboot Controller"
+        self._attr_unique_id = f"{coordinator.settings_hub.topic_prefix}_reboot_controller"
+
+    async def async_press(self) -> None:
+        await self.coordinator.settings_hub.async_reboot()
 
 
 class AfterburnerResetFuelButton(ButtonEntity):
