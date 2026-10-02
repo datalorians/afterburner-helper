@@ -3,14 +3,13 @@
 from __future__ import annotations
 
 import asyncio
-from collections import deque
 from dataclasses import dataclass
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import STATE_ON, STATE_UNAVAILABLE, STATE_UNKNOWN
 from homeassistant.core import Context, HomeAssistant, callback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.event import async_call_later, async_track_state_change_event
 from homeassistant.helpers.storage import Store
 
 from .const import (
@@ -85,12 +84,16 @@ class HeatGroupManager:
         self.member_targets = {source: 22.0 for source in HEAT_SOURCES}
         self._listeners: set[Any] = set()
         self._unsub = None
+        self._startup_unsub = None
+        self._startup_ready = False
+        self._startup_seen_temperature_sources: set[str] = set()
         self._lock = asyncio.Lock()
         self._store = Store(hass, 1, f"afterburner_helper.{entry.entry_id}.heat_group")
-        self._owned_contexts: deque[str] = deque(maxlen=20)
         self._diesel_contexts = diesel_contexts
         self._last_diesel_command: str | None = None
+        self._last_diesel_command_at = 0.0
         self._last_switch_commands: dict[str, str] = {}
+        self._last_switch_command_at: dict[str, float] = {}
 
     async def async_start(self) -> None:
         saved = await self._store.async_load()
@@ -127,6 +130,16 @@ class HeatGroupManager:
             entity_ids=list(dict.fromkeys(watched)),
             action=self._state_changed,
         )
+        # Source integrations restore and reconnect at different times during a
+        # Home Assistant boot. Do not stage against a partial fused value (for
+        # example, the colder sensor arriving before the warmer one). Reconcile
+        # as soon as every control source has emitted a valid state, with a
+        # bounded fallback for a sensor that remains unavailable.
+        self._startup_unsub = async_call_later(
+            self.hass,
+            30,
+            self._startup_stabilized,
+        )
         if saved:
             await self.async_reconcile()
         else:
@@ -136,23 +149,44 @@ class HeatGroupManager:
         if self._unsub:
             self._unsub()
             self._unsub = None
+        if self._startup_unsub:
+            self._startup_unsub()
+            self._startup_unsub = None
 
     @callback
     def _state_changed(self, event) -> None:
-        source = next(
-            (
-                name
-                for name, entity_id in self.electric_entities.items()
-                if entity_id == event.data.get("entity_id")
-            ),
-            None,
-        )
-        if source and event.context.id not in self._owned_contexts:
+        entity_id = event.data.get("entity_id")
+        if entity_id in self.control_temperature_entities:
             new_state = event.data.get("new_state")
-            if new_state and new_state.state in {STATE_ON, "off"}:
-                self.member_modes[source] = "heat" if new_state.state == STATE_ON else "off"
-                self.hass.async_create_task(self._changed_without_reconcile())
-                return
+            if new_state and fused_temperature((new_state.state,)) is not None:
+                self._startup_seen_temperature_sources.add(entity_id)
+                if set(self.control_temperature_entities).issubset(
+                    self._startup_seen_temperature_sources
+                ):
+                    self._set_startup_ready()
+        self.hass.async_create_task(self.async_reconcile())
+
+    @property
+    def control_temperature_entities(self) -> tuple[str, ...]:
+        """Entities that must settle before startup staging is enabled."""
+        if self.use_fused_temperature:
+            return self.fused_temperature_entities
+        return (self.room_entity,)
+
+    @callback
+    def _startup_stabilized(self, _now) -> None:
+        """End the bounded startup hold even if one source is unavailable."""
+        self._startup_unsub = None
+        self._set_startup_ready()
+
+    @callback
+    def _set_startup_ready(self) -> None:
+        if self._startup_ready:
+            return
+        self._startup_ready = True
+        if self._startup_unsub:
+            self._startup_unsub()
+            self._startup_unsub = None
         self.hass.async_create_task(self.async_reconcile())
 
     @callback
@@ -235,12 +269,13 @@ class HeatGroupManager:
 
     async def async_reconcile(self) -> None:
         async with self._lock:
+            if not self._startup_ready:
+                self._notify()
+                return
             requested = self._requested_sources()
             await self._set_diesel("diesel" in requested)
             for source, entity_id in self.electric_entities.items():
                 if entity_id:
-                    if self.lockouts[source] and self.member_modes[source] == "auto":
-                        continue
                     await self._set_switch(entity_id, source in requested)
             self._notify()
 
@@ -250,15 +285,21 @@ class HeatGroupManager:
             return
         current = state.state if state else None
         mode = "heat" if enabled else "off"
-        if self._last_diesel_command == mode:
-            return
         if current == mode:
             self._last_diesel_command = mode
+            self._last_diesel_command_at = self.hass.loop.time()
+            return
+        now = self.hass.loop.time()
+        if (
+            self._last_diesel_command == mode
+            and now - self._last_diesel_command_at < 5
+        ):
             return
         if enabled:
             await self.hass.services.async_call("climate", "set_temperature", {"entity_id": self.diesel_entity, "temperature": self.target_temperature}, blocking=True, context=Context())
         context = Context()
         self._last_diesel_command = mode
+        self._last_diesel_command_at = now
         if self._diesel_contexts is not None:
             self._diesel_contexts.append(context.id)
         await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": self.diesel_entity, "hvac_mode": mode}, blocking=True, context=context)
@@ -268,15 +309,20 @@ class HeatGroupManager:
         if state is None or state.state in {STATE_UNAVAILABLE, STATE_UNKNOWN}:
             return
         desired = STATE_ON if enabled else "off"
-        if self._last_switch_commands.get(entity_id) == desired:
-            return
         if state.state == desired:
             self._last_switch_commands[entity_id] = desired
+            self._last_switch_command_at[entity_id] = self.hass.loop.time()
+            return
+        now = self.hass.loop.time()
+        if (
+            self._last_switch_commands.get(entity_id) == desired
+            and now - self._last_switch_command_at.get(entity_id, 0) < 5
+        ):
             return
         if state.state != desired:
             context = Context()
-            self._owned_contexts.append(context.id)
             self._last_switch_commands[entity_id] = desired
+            self._last_switch_command_at[entity_id] = now
             await self.hass.services.async_call(
                 "switch",
                 "turn_on" if enabled else "turn_off",
@@ -319,7 +365,9 @@ class HeatGroupManager:
 
     async def _changed(self) -> None:
         self._last_diesel_command = None
+        self._last_diesel_command_at = 0.0
         self._last_switch_commands.clear()
+        self._last_switch_command_at.clear()
         await self._changed_without_reconcile()
         await self.async_reconcile()
 

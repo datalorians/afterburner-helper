@@ -1,0 +1,31 @@
+# Event-by-event export of heater, climate-group, and temperature-model data.
+# Home Assistant Recorder remains the primary local history store.
+
+influxdb:
+  api_version: 1
+  host: a0d7b954-influxdb
+  port: 8086
+  database: homeassistant
+  max_retries: 5
+  default_measurement: state
+  include:
+    entity_globs:
+      - sensor.rv_diesel_heater_helper_*
+      - sensor.climate_control_*
+      - climate.climate_control_afterburner_*
+    entities:
+      - climate.afterburner
+      - binary_sensor.afterburner_run_request
+      - sensor.afterburner_desired
+      - sensor.afterburner_error_state
+      - sensor.afterburner_fan_speed
+      - sensor.afterburner_fuel_used
+      - sensor.afterburner_glow_plug_current
+      - sensor.afterburner_glow_plug_voltage
+      - sensor.afterburner_heater_temperature
+      - sensor.afterburner_input_voltage
+      - sensor.afterburner_pump_speed
+      - sensor.afterburner_run_state
+      - sensor.afterburner_temperature_3
+      - sensor.igneous_bedroom_temperature_ds18b20_2
+      - sensor.spare_temperature

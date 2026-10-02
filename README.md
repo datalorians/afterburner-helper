@@ -164,6 +164,9 @@ while enabling its sidebar entry remains explicit and non-destructive.
 [`examples/dashboard_cards.yaml`](examples/dashboard_cards.yaml) also contains
 smaller starter cards. Measurements can be retained by Home Assistant Recorder
 or exported to InfluxDB for Grafana dashboards and long-range analysis.
+The included [`examples/afterburner_influx.yaml`](examples/afterburner_influx.yaml)
+exports the complete fused-temperature model, its source sensors, outdoor
+reference and deltas, group climates, and diesel-heater telemetry.
 
 ## Controller settings over MQTT
 

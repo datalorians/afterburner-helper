@@ -16,6 +16,7 @@ replacement for the Afterburner web interface.
 - Firmware version/date, uptime, free memory, heater runtime, and glow runtime
 - Refresh commands and the controller's two-step MQTT reboot handshake
 - Configurable fused indoor temperature and outdoor reference/delta logging
+- Restart-safe staged control with persisted member modes and a temperature-source stabilization hold
 
 ## Next implementation groups
 

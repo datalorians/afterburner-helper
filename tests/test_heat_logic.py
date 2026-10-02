@@ -28,6 +28,14 @@ class HeatGroupTests(unittest.TestCase):
             ("electric_1", "electric_2"),
         )
 
+    def test_one_degree_deficit_uses_only_first_automatic_source(self):
+        values = self.defaults()
+        values["room"] = 21.0
+        self.assertEqual(
+            heat_logic.requested_sources(**values),
+            ("electric_1",),
+        )
+
     def test_three_degree_deficit_adds_diesel_last(self):
         values = self.defaults()
         values["room"] = 18.5
