@@ -326,6 +326,8 @@ class HeatGroupManager:
             self._last_diesel_command == mode
             and now - self._last_diesel_command_at < 5
         ):
+            if enabled and diesel_is_inactive:
+                self._schedule_confirmation_retry(6)
             return
         if enabled:
             await self.hass.services.async_call("climate", "set_temperature", {"entity_id": self.diesel_entity, "temperature": self.target_temperature}, blocking=True, context=Context())
@@ -335,6 +337,8 @@ class HeatGroupManager:
         if self._diesel_contexts is not None:
             self._diesel_contexts.append(context.id)
         await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": self.diesel_entity, "hvac_mode": mode}, blocking=True, context=context)
+        if enabled:
+            self._schedule_confirmation_retry(10)
 
     async def _set_switch(self, entity_id: str, enabled: bool) -> None:
         state = self.hass.states.get(entity_id)
@@ -362,9 +366,9 @@ class HeatGroupManager:
                 blocking=True,
                 context=context,
             )
-            self._schedule_confirmation_retry()
+            self._schedule_confirmation_retry(3)
 
-    def _schedule_confirmation_retry(self) -> None:
+    def _schedule_confirmation_retry(self, delay: int) -> None:
         """Retry an unconfirmed physical command without waiting for polling."""
         if self._retry_unsub is not None:
             return
@@ -374,7 +378,7 @@ class HeatGroupManager:
             self._retry_unsub = None
             self.hass.async_create_task(self.async_reconcile())
 
-        self._retry_unsub = async_call_later(self.hass, 3, _retry)
+        self._retry_unsub = async_call_later(self.hass, delay, _retry)
 
     async def async_set_master_enabled(self, enabled: bool) -> None:
         self.master_enabled = enabled
