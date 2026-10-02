@@ -41,6 +41,7 @@ start and shutdown commands.
 | Tank level and runtime | Minimum run/off timing | Low-fire flameout warning | InfluxDB and Grafana friendly |
 | Refill calibration | Manual-stop latch | Bounded recovery attempt | Price-at-time-of-use cost ledger |
 | Current and projected cost | Optional phone presence | Normal ECU cooldown | Long-term statistics |
+| Persistent mixture settings | Multi-page Climate dashboard | Pump/fan map editing | MQTT settings refresh |
 
 The control and fuel logic is covered by 23 dependency-free tests, including
 recorded failed-start, flameout, and successful overnight-run cases from a real
@@ -110,10 +111,35 @@ Replace `person.your_name` and the example entity IDs before using it.
 
 ## Dashboards and analytics
 
-[`examples/dashboard_cards.yaml`](examples/dashboard_cards.yaml) contains
-starter Lovelace cards. The integration's measurements can also be retained by
-Home Assistant Recorder or exported to InfluxDB for Grafana dashboards and
-long-range analysis.
+The repository includes the complete
+[`Climate Control` dashboard](dashboards/climate-control.yaml), with separate
+pages for basic climate control, detailed diesel-heater status, electric-heater
+expansion, thermostat/cyclic operation, frost protection, fuel and mixture,
+timers, GPIO, and system diagnostics. See
+[`dashboards/README.md`](dashboards/README.md) for the short sidebar setup step.
+
+Home Assistant intentionally does not provide custom integrations with a
+supported API for silently overwriting a user's Lovelace registry or
+`configuration.yaml`. The dashboard therefore ships with every installation,
+while enabling its sidebar entry remains explicit and non-destructive.
+
+[`examples/dashboard_cards.yaml`](examples/dashboard_cards.yaml) also contains
+smaller starter cards. Measurements can be retained by Home Assistant Recorder
+or exported to InfluxDB for Grafana dashboards and long-range analysis.
+
+## Controller settings over MQTT
+
+Version 2.3 adds persistent entities for the active Afterburner mixture map:
+
+- minimum and maximum pump frequency;
+- minimum and maximum fan speed;
+- pump volume per stroke;
+- thermostat window; and
+- offsets for environmental temperature sensors 1–4.
+
+Changes are sent to the controller's documented command topics and committed
+using Afterburner's `NVsave` command. A **Refresh settings** button requests a
+fresh controller snapshot instead of relying on guessed or cached values.
 
 ## Development
 

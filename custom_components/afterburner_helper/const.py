@@ -8,7 +8,7 @@ from homeassistant.const import Platform
 
 DOMAIN = "afterburner_helper"
 INTEGRATION_NAME = "Afterburner Helper"
-PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.BUTTON]
 COORDINATOR_INTERVAL = timedelta(seconds=10)
 
 CONF_DEVICE_NAME = "device_name"

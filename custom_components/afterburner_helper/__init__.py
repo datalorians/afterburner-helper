@@ -7,6 +7,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN, PLATFORMS
 from .coordinator import AfterburnerCoordinator
+from .settings import AfterburnerSettingsHub
 
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -28,6 +29,8 @@ async def _async_reload_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up one Afterburner helper entry."""
     coordinator = AfterburnerCoordinator(hass, entry)
+    coordinator.settings_hub = AfterburnerSettingsHub(hass, entry)
+    await coordinator.settings_hub.async_start()
     await coordinator.async_initialize()
     await coordinator.async_config_entry_first_refresh()
     coordinator.async_start()
@@ -43,5 +46,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
         coordinator: AfterburnerCoordinator = hass.data[DOMAIN].pop(entry.entry_id)
+        await coordinator.settings_hub.async_stop()
         coordinator.async_stop()
     return unload_ok

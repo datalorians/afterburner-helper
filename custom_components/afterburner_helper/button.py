@@ -11,7 +11,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME, DOMAIN
+from .coordinator import AfterburnerCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -22,16 +23,41 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up the Afterburner button platform."""
-    data = hass.data[DOMAIN][config_entry.entry_id]
-    topic_prefix = data["mqtt_topic_prefix"]
-    device_name = data["device_name"]
+    coordinator: AfterburnerCoordinator = hass.data[DOMAIN][config_entry.entry_id]
+    topic_prefix = coordinator.settings_hub.topic_prefix
+    device_name = config_entry.data.get(CONF_DEVICE_NAME, DEFAULT_DEVICE_NAME)
 
     async_add_entities([
         AfterburnerResetFuelButton(topic_prefix, device_name),
         AfterburnerPrimePumpButton(topic_prefix, device_name),
         AfterburnerTestOnButton(topic_prefix, device_name),
         AfterburnerTestOffButton(topic_prefix, device_name),
+        AfterburnerRefreshSettingsButton(coordinator, device_name),
     ])
+
+
+class AfterburnerRefreshSettingsButton(ButtonEntity):
+    """Ask the controller to republish all settings and telemetry."""
+
+    _attr_icon = "mdi:refresh"
+
+    def __init__(self, coordinator: AfterburnerCoordinator, device_name: str) -> None:
+        self.coordinator = coordinator
+        self._device_name = device_name
+        self._attr_name = f"{device_name} Refresh Settings"
+        self._attr_unique_id = f"{coordinator.settings_hub.topic_prefix}_refresh_settings"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self.coordinator.settings_hub.topic_prefix)},
+            name=self._device_name,
+            manufacturer="Afterburner",
+            model="Diesel Heater Controller",
+        )
+
+    async def async_press(self) -> None:
+        await self.coordinator.settings_hub.async_publish("Refresh", 1, save=False)
 
 
 class AfterburnerResetFuelButton(ButtonEntity):

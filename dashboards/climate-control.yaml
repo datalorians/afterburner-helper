@@ -1,0 +1,374 @@
+title: Climate Control
+views:
+  - title: Climate
+    path: climate
+    icon: mdi:home-thermometer
+    badges: []
+    cards:
+      - type: thermostat
+        entity: climate.afterburner
+        name: Diesel Heater
+        features:
+          - type: climate-hvac-modes
+            hvac_modes:
+              - "off"
+              - heat
+
+  - title: Diesel Heater
+    path: diesel-heater
+    icon: mdi:radiator
+    badges: []
+    cards:
+      - type: thermostat
+        entity: climate.afterburner
+        name: Diesel Heater
+        features:
+          - type: climate-hvac-modes
+            hvac_modes:
+              - "off"
+              - heat
+      - type: gauge
+        entity: sensor.rv_diesel_heater_helper_fuel_remaining_percent
+        name: Calibrated Diesel Fuel
+        needle: true
+        severity:
+          green: 50
+          yellow: 20
+          red: 0
+      - type: entities
+        title: Fuel
+        show_header_toggle: false
+        entities:
+          - entity: sensor.rv_diesel_heater_helper_fuel_remaining
+            name: Fuel remaining
+          - entity: sensor.rv_diesel_heater_helper_fuel_rate
+            name: Current burn rate
+          - entity: sensor.rv_diesel_heater_helper_fuel_runtime_at_current_rate
+            name: Runtime at current rate
+          - entity: sensor.rv_diesel_heater_helper_fuel_runtime_at_maximum_rate
+            name: Runtime at maximum rate
+          - entity: sensor.afterburner_fuel_used
+            name: Raw controller fuel used (calibration)
+      - type: entities
+        title: Fuel Cost
+        show_header_toggle: false
+        entities:
+          - entity: number.rv_diesel_heater_helper_diesel_price_per_litre
+            name: Diesel price
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_hour
+            name: Current cost per hour
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_24h_at_current_output
+            name: 24h at current output
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_30d_at_current_output
+            name: 30d at current output
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_hour_at_maximum_output
+            name: Maximum cost per hour
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_per_30d_at_maximum_output
+            name: 30d at maximum output
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_used_since_reset
+            name: Cost this tank interval
+          - entity: sensor.rv_diesel_heater_helper_fuel_cost_recorded_total
+            name: Recorded total cost
+          - entity: sensor.rv_diesel_heater_helper_fuel_value_remaining
+            name: Remaining fuel value
+          - entity: sensor.rv_diesel_heater_helper_full_tank_cost
+            name: Full tank cost
+      - type: entities
+        title: Heater Status
+        show_header_toggle: false
+        entities:
+          - entity: sensor.afterburner_temperature_3
+            name: Room temperature
+          - entity: sensor.afterburner_desired
+            name: Requested temperature
+          - entity: sensor.afterburner_heater_temperature
+            name: Heat exchanger temperature
+          - entity: sensor.afterburner_run_state
+            name: Run state
+          - entity: sensor.afterburner_error_state
+            name: Controller status
+          - entity: sensor.afterburner_pump_speed
+            name: Pump frequency
+          - entity: sensor.afterburner_fan_speed
+            name: Fan speed
+          - entity: sensor.afterburner_input_voltage
+            name: Input voltage
+      - type: entities
+        title: Automatic Control
+        show_header_toggle: false
+        entities:
+          - entity: sensor.rv_diesel_heater_helper_control_state
+            name: Controller state
+          - entity: sensor.rv_diesel_heater_helper_control_recommendation
+            name: Current action
+          - entity: sensor.rv_diesel_heater_helper_recovery_state
+            name: Recovery state
+          - entity: sensor.rv_diesel_heater_helper_flameout_warning
+            name: Flame stability
+      - type: entities
+        title: Occupancy
+        show_header_toggle: false
+        state_color: true
+        entities:
+          - entity: sensor.diesel_heater_occupancy_climate_mode
+            name: Current mode
+          - entity: person.datalore
+            name: Phone presence
+          - entity: input_boolean.diesel_heater_occupancy_control
+            name: Occupancy control
+          - entity: input_boolean.diesel_heater_guest_mode
+            name: Guest mode
+          - entity: input_number.diesel_heater_home_temperature
+            name: Home temperature
+          - entity: input_number.diesel_heater_away_temperature
+            name: Away temperature
+          - entity: input_number.diesel_heater_away_delay
+            name: Departure delay
+      - type: history-graph
+        title: Temperature History
+        hours_to_show: 24
+        entities:
+          - entity: sensor.afterburner_temperature_3
+            name: Room
+          - entity: sensor.afterburner_desired
+            name: Requested
+          - entity: sensor.afterburner_heater_temperature
+            name: Heat exchanger
+      - type: history-graph
+        title: Fuel Demand History
+        hours_to_show: 24
+        entities:
+          - entity: sensor.afterburner_pump_speed
+            name: Pump frequency
+          - entity: sensor.rv_diesel_heater_helper_fuel_rate
+            name: Calculated burn rate
+
+  - title: Electric Heaters
+    path: electric-heaters
+    icon: mdi:radiator-disabled
+    badges: []
+    cards:
+      - type: markdown
+        title: Electric Heaters
+        content: >-
+          Electric heater controls will live here when they are added. This page
+          is reserved so those controls do not clutter the main Climate page.
+
+  - title: Thermostat & Cyclic
+    path: thermostat-cyclic
+    icon: mdi:thermostat-cog
+    badges: []
+    cards:
+      - type: entities
+        title: Thermostat
+        show_header_toggle: false
+        entities:
+          - entity: switch.afterburner_thermostat_enable
+            name: Thermostat enabled
+          - entity: select.afterburner_thermostat_mode
+            name: Thermostat mode
+          - entity: sensor.afterburner_temperature_3
+            name: Room temperature
+          - entity: sensor.afterburner_desired
+            name: Temperature demand
+          - entity: number.afterburner_set_power_demand
+            name: Fixed power demand
+          - entity: number.afterburner_thermostat_window
+            name: Thermostat window
+      - type: entities
+        title: Cyclic Start / Stop
+        show_header_toggle: false
+        entities:
+          - entity: switch.afterburner_cyclic_enable
+            name: Cyclic control enabled
+          - entity: number.afterburner_cyclic_on_offset
+            name: Start offset
+          - entity: number.afterburner_cyclic_off_offset
+            name: Stop offset
+          - entity: number.afterburner_cyclic_restart_temperature
+            name: Calculated restart temperature
+          - entity: number.afterburner_cyclic_stop_temperature
+            name: Calculated stop temperature
+          - entity: binary_sensor.afterburner_run_request
+            name: Run request
+      - type: history-graph
+        title: Thermostat History
+        hours_to_show: 24
+        entities:
+          - entity: sensor.afterburner_temperature_3
+            name: Room
+          - entity: sensor.afterburner_desired
+            name: Demand
+          - entity: sensor.afterburner_desired_pump_speed
+            name: Requested pump speed
+
+  - title: Frost Protection
+    path: frost-protection
+    icon: mdi:snowflake-thermometer
+    badges: []
+    cards:
+      - type: entities
+        title: Frost Mode
+        show_header_toggle: false
+        entities:
+          - entity: switch.afterburner_frost_enable
+            name: Frost protection enabled
+          - entity: select.afterburner_frost_mode
+            name: Frost mode
+          - entity: number.afterburner_frost_start_temperature
+            name: Start temperature
+          - entity: number.afterburner_frost_target_temperature
+            name: Target temperature
+          - entity: sensor.afterburner_frost_rise
+            name: Configured temperature rise
+          - entity: binary_sensor.afterburner_frost_active
+            name: Frost cycle active
+          - entity: binary_sensor.afterburner_frost_hold
+            name: Frost hold
+
+  - title: Fuel & Mixture
+    path: fuel-mixture
+    icon: mdi:fuel
+    badges: []
+    cards:
+      - type: entities
+        title: Live Fuel Data
+        show_header_toggle: false
+        entities:
+          - entity: sensor.afterburner_pump_speed
+            name: Actual pump frequency
+          - entity: sensor.afterburner_desired_pump_speed
+            name: Requested pump frequency
+          - entity: sensor.afterburner_fan_speed
+            name: Fan speed
+          - entity: sensor.afterburner_fuel_rate
+            name: Controller fuel rate
+          - entity: sensor.rv_diesel_heater_helper_fuel_rate
+            name: Calibrated fuel rate
+          - entity: sensor.afterburner_fuel_used
+            name: Fuel used since reset
+          - entity: sensor.afterburner_total_fuel_used
+            name: Controller lifetime fuel
+      - type: entities
+        title: Active Mixture Map
+        show_header_toggle: false
+        entities:
+          - entity: number.afterburner_minimum_pump_frequency
+            name: Minimum pump frequency
+          - entity: number.afterburner_minimum_fan_speed
+            name: Minimum fan speed
+          - entity: number.afterburner_maximum_pump_frequency
+            name: Maximum pump frequency
+          - entity: number.afterburner_maximum_fan_speed
+            name: Maximum fan speed
+          - entity: button.afterburner_refresh_settings
+            name: Refresh controller settings
+      - type: entities
+        title: Fuel Calibration
+        show_header_toggle: false
+        entities:
+          - entity: number.afterburner_tank_capacity
+            name: Tank capacity
+          - entity: number.afterburner_pump_volume_per_stroke
+            name: Pump volume per stroke
+          - entity: number.rv_diesel_heater_helper_diesel_price_per_litre
+            name: Diesel price
+          - entity: button.afterburner_reset_fuel_usage
+            name: Reset controller fuel usage
+      - type: markdown
+        title: Alternate Mixture Maps
+        content: >-
+          The active map is now editable and saved persistently through MQTT.
+          The four altitude-indexed alternate maps still require additional
+          firmware command support and will be added here when available.
+
+  - title: Timers
+    path: timers
+    icon: mdi:timer-cog-outline
+    badges: []
+    cards:
+      - type: markdown
+        title: Afterburner Timers
+        content: >-
+          This page is reserved for the Afterburner's fourteen scheduled timers,
+          including weekday selection, start/stop time, temperature commands,
+          GPIO actions, and repeat/once operation. The current Afterburner MQTT
+          discovery does not expose timer programming yet.
+
+  - title: GPIO
+    path: gpio
+    icon: mdi:chip
+    badges: []
+    cards:
+      - type: entities
+        title: Inputs
+        show_header_toggle: false
+        entities:
+          - entity: binary_sensor.afterburner_gp_in_1_disabled
+            name: GPIO input 1
+          - entity: binary_sensor.afterburner_gp_in_2_disabled
+            name: GPIO input 2
+          - entity: sensor.afterburner_analogue_input
+            name: Analogue input
+      - type: entities
+        title: User Outputs
+        show_header_toggle: false
+        entities:
+          - entity: switch.afterburner_gp_out_1_user
+            name: GPIO output 1
+          - entity: switch.afterburner_gp_out_2_user
+            name: GPIO output 2
+      - type: markdown
+        title: GPIO Configuration
+        content: >-
+          Input and output mode configuration, thresholds, inversion, servo drive,
+          fuel-sender calibration, and pulse counting will be added here as the
+          helper gains persistent Afterburner setting commands.
+
+  - title: System
+    path: system
+    icon: mdi:cog-outline
+    badges: []
+    cards:
+      - type: entities
+        title: Controller Diagnostics
+        show_header_toggle: false
+        entities:
+          - entity: sensor.afterburner_run_state
+            name: Run state
+          - entity: sensor.afterburner_error_state
+            name: Controller status
+          - entity: sensor.afterburner_input_voltage
+            name: Input voltage
+          - entity: sensor.afterburner_glow_plug_voltage
+            name: Glow plug voltage
+          - entity: sensor.afterburner_glow_plug_current
+            name: Glow plug current
+          - entity: sensor.afterburner_altitude
+            name: Reported altitude
+          - entity: sensor.afterburner_heater_temperature
+            name: Heat exchanger temperature
+      - type: entities
+        title: Environmental Sensor Calibration
+        show_header_toggle: false
+        entities:
+          - entity: number.afterburner_temperature_1_offset
+          - entity: number.afterburner_temperature_2_offset
+          - entity: number.afterburner_temperature_3_offset
+          - entity: number.afterburner_temperature_4_offset
+          - entity: button.afterburner_refresh_settings
+            name: Refresh controller settings
+      - type: entities
+        title: Service Functions
+        show_header_toggle: false
+        entities:
+          - entity: button.afterburner_prime_pump
+            name: Prime fuel pump
+      - type: markdown
+        title: Remaining System Settings
+        content: >-
+          Voltage calibration and cutout, pump calibration, altitude compensation,
+          environmental sensor offsets, system clock, reboot, firmware update,
+          communications, logging, and the virtual console are mapped for future
+          helper support. Network credentials will not be displayed on this
+          dashboard.
