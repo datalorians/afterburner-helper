@@ -32,7 +32,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     coordinator = AfterburnerCoordinator(hass, entry)
     coordinator.settings_hub = AfterburnerSettingsHub(hass, entry)
     await coordinator.settings_hub.async_start()
-    coordinator.heat_group = HeatGroupManager(hass, entry)
+    coordinator.heat_group = HeatGroupManager(
+        hass,
+        entry,
+        coordinator._owned_service_contexts,
+    )
     await coordinator.heat_group.async_start()
     await coordinator.async_initialize()
     await coordinator.async_config_entry_first_refresh()
