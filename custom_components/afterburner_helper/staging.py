@@ -29,6 +29,7 @@ from .const import (
     DEFAULT_USE_FUSED_TEMPERATURE,
     HEAT_SOURCES,
     PRIORITY_OPTIONS,
+    SOURCE_ENTITIES,
 )
 from .heat_logic import hysteretic_stage_count, requested_sources
 from .temperature import fused_temperature
@@ -85,6 +86,7 @@ class HeatGroupManager:
         self._listeners: set[Any] = set()
         self._unsub = None
         self._startup_unsub = None
+        self._retry_unsub = None
         self._startup_ready = False
         self._startup_seen_temperature_sources: set[str] = set()
         self._lock = asyncio.Lock()
@@ -122,6 +124,7 @@ class HeatGroupManager:
         watched = [
             self.room_entity,
             self.diesel_entity,
+            SOURCE_ENTITIES["run_state"],
             self.outdoor_temperature_entity,
             *self.fused_temperature_entities,
         ]
@@ -153,6 +156,9 @@ class HeatGroupManager:
         if self._startup_unsub:
             self._startup_unsub()
             self._startup_unsub = None
+        if self._retry_unsub:
+            self._retry_unsub()
+            self._retry_unsub = None
 
     @callback
     def _state_changed(self, event) -> None:
@@ -296,7 +302,22 @@ class HeatGroupManager:
             return
         current = state.state if state else None
         mode = "heat" if enabled else "off"
-        if current == mode:
+        run_state = self.hass.states.get(SOURCE_ENTITIES["run_state"])
+        actual_run_state = run_state.state.strip().lower() if run_state else ""
+        diesel_is_inactive = actual_run_state in {
+            "stopped/ready",
+            "stopped",
+            "ready",
+            "off",
+        }
+        diesel_is_stopping = actual_run_state in {"stopping", "shutdown"}
+        # A MQTT climate can remain in Heat while the physical controller is
+        # stopping or stopped. Never treat that stale mode as proof that heat
+        # is running. Wait for the mandatory cooldown, then reassert Heat when
+        # the real run-state reaches Ready.
+        if enabled and diesel_is_stopping:
+            return
+        if current == mode and not (enabled and diesel_is_inactive):
             self._last_diesel_command = mode
             self._last_diesel_command_at = self.hass.loop.time()
             return
@@ -327,7 +348,7 @@ class HeatGroupManager:
         now = self.hass.loop.time()
         if (
             self._last_switch_commands.get(entity_id) == desired
-            and now - self._last_switch_command_at.get(entity_id, 0) < 5
+            and now - self._last_switch_command_at.get(entity_id, 0) < 2
         ):
             return
         if state.state != desired:
@@ -341,6 +362,19 @@ class HeatGroupManager:
                 blocking=True,
                 context=context,
             )
+            self._schedule_confirmation_retry()
+
+    def _schedule_confirmation_retry(self) -> None:
+        """Retry an unconfirmed physical command without waiting for polling."""
+        if self._retry_unsub is not None:
+            return
+
+        @callback
+        def _retry(_now) -> None:
+            self._retry_unsub = None
+            self.hass.async_create_task(self.async_reconcile())
+
+        self._retry_unsub = async_call_later(self.hass, 3, _retry)
 
     async def async_set_master_enabled(self, enabled: bool) -> None:
         self.master_enabled = enabled
@@ -364,6 +398,16 @@ class HeatGroupManager:
 
     async def async_set_lockout(self, source: str, locked: bool) -> None:
         self.lockouts[source] = locked
+        # Lockout is an immediate actuator command. Automatic mode stays
+        # selected so unlocking can return the source to group control; only
+        # an explicit member Heat mode is allowed to override the lockout.
+        if locked and self.member_modes[source] != "heat":
+            if source == "diesel":
+                await self._set_diesel(False)
+            else:
+                entity_id = self.electric_entities.get(source)
+                if entity_id:
+                    await self._set_switch(entity_id, False)
         await self._changed()
 
     async def async_set_member_mode(self, source: str, mode: str) -> None:
