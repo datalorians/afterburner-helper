@@ -1,122 +1,113 @@
-<div align="center">
-  <img src="assets/afterburner-helper.svg" alt="Afterburner Helper logo" width="150">
+<p align="center">
+  <img src="assets/afterburner-helper.svg" width="120" alt="Afterburner Helper">
+</p>
 
-  # Afterburner Helper
+<h1 align="center">Afterburner Helper</h1>
 
-  **Fuel intelligence, flameout detection, and automatic climate control for an Afterburner-equipped diesel heater.**
+<p align="center">
+  Fuel intelligence and climate automation for Afterburner-equipped diesel heaters.
+</p>
 
-  [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-custom%20integration-18BCF2?logo=homeassistant&logoColor=white)](https://www.home-assistant.io/)
-  [![Validate](https://github.com/datalorians/afterburner-helper/actions/workflows/validate.yml/badge.svg)](https://github.com/datalorians/afterburner-helper/actions/workflows/validate.yml)
-  [![HACS](https://img.shields.io/badge/HACS-custom_repository-41BDF5?logo=homeassistantcommunitystore&logoColor=white)](https://hacs.xyz/)
-  [![License: MIT](https://img.shields.io/badge/License-MIT-f5c542.svg)](LICENSE)
-  [![AI assisted](https://img.shields.io/badge/development-AI%20assisted-7C3AED)](AI_DISCLOSURE.md)
-</div>
+<p align="center">
+  <a href="https://github.com/datalorians/afterburner-helper/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/datalorians/afterburner-helper?display_name=tag&sort=semver"></a>
+  <a href="https://github.com/datalorians/afterburner-helper/actions/workflows/validate.yml"><img alt="Validation" src="https://github.com/datalorians/afterburner-helper/actions/workflows/validate.yml/badge.svg"></a>
+  <a href="https://www.home-assistant.io/"><img alt="Home Assistant" src="https://img.shields.io/badge/Home%20Assistant-custom%20integration-18BCF2?logo=homeassistant&logoColor=white"></a>
+  <a href="LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-2ea44f"></a>
+</p>
 
-> [!NOTE]
-> This project complements the community [Afterburner diesel-heater
-> controller](https://gitlab.com/mrjones.id.au/bluetoothheater). It is not an
-> official Afterburner or Home Assistant project.
+Afterburner Helper turns the telemetry already published by an
+[Afterburner controller](https://gitlab.com/mrjones.id.au/bluetoothheater)
+into useful fuel, cost, combustion, and climate-control entities in Home
+Assistant. It works alongside the stock heater ECU and Afterburner's normal
+start and shutdown commands.
 
-## ✨ What it does
+> [!IMPORTANT]
+> This is an independent community project. It is not affiliated with or
+> endorsed by Afterburner or Home Assistant.
 
-- ⛽ Calculates a canonical fuel rate and remaining fuel from pump frequency.
-- 💸 Records fuel cost incrementally at the diesel price that applied when the
-  fuel was burned, so later price changes do not rewrite history.
-- 📐 Supports tank size, pump displacement, calibration correction, and a
-  refill-calibration model.
-- 🔥 Detects ignition-ramp collapse and low-fire flameout signatures from live
-  heater telemetry.
-- 🛟 Can perform one bounded low-fire recovery attempt, then restore the prior
-  demand or request a normal shutdown.
-- 🌡️ Provides automatic stop/start cycling around the desired temperature with
-  configurable offsets, hold times, minimum run/off times, and cooldown checks.
-- 🛑 Preserves an intentional manual stop until a later setpoint change enters
-  the configured start range.
-- 🏠 Includes an optional phone-presence Home/Away climate package with a guest
-  override and departure delay.
-- 📊 Exposes Home Assistant sensors suitable for Recorder, InfluxDB, and Grafana.
+## Capabilities
 
-## 🧭 Project status
+| ⛽ Fuel | 🌡️ Climate | 🔥 Combustion | 📈 History |
+|:--|:--|:--|:--|
+| Pump-frequency fuel model | Setpoint-based start and stop | Ignition-collapse detection | Recorder-ready entities |
+| Tank level and runtime | Minimum run/off timing | Low-fire flameout warning | InfluxDB and Grafana friendly |
+| Refill calibration | Manual-stop latch | Bounded recovery attempt | Price-at-time-of-use cost ledger |
+| Current and projected cost | Optional phone presence | Normal ECU cooldown | Long-term statistics |
 
-The integration is actively developed against a real Afterburner V3.5.2 setup.
-Its dependency-free control and fuel suite currently contains 23 tests,
-including recorded failed-start, flameout, and successful overnight-run cases.
+The control and fuel logic is covered by 23 dependency-free tests, including
+recorded failed-start, flameout, and successful overnight-run cases from a real
+Afterburner V3.5.2 installation.
 
-This is an early public release. Entity names and configuration options may
-change while the migration from older YAML helpers is completed.
+## Install
 
-## 🚀 Installation
+### HACS
 
-### HACS custom repository
-
-1. Open HACS in Home Assistant.
-2. Open the three-dot menu and choose **Custom repositories**.
-3. Add `https://github.com/datalorians/afterburner-helper` as an
+1. In HACS, open **Custom repositories**.
+2. Add `https://github.com/datalorians/afterburner-helper` as an
    **Integration** repository.
-4. Install **Afterburner Helper** and restart Home Assistant.
-5. Go to **Settings → Devices & services → Add integration**, search for
-   **Afterburner Helper**, and complete the configuration flow.
+3. Install **Afterburner Helper** and restart Home Assistant.
+4. Open **Settings → Devices & services → Add integration** and select
+   **Afterburner Helper**.
 
-### Manual installation
+### Manual
 
-Copy `custom_components/afterburner_helper` into your Home Assistant
-`/config/custom_components/` directory, then restart Home Assistant and add the
-integration from **Settings → Devices & services**.
+Copy [`custom_components/afterburner_helper`](custom_components/afterburner_helper)
+to `/config/custom_components/afterburner_helper`, restart Home Assistant, and
+add the integration from **Devices & services**.
 
-## 🔌 Expected data sources
+## How climate control works
 
-Afterburner Helper reads entities exposed by Afterburner's MQTT discovery,
-including room temperature, requested temperature, heat-exchanger temperature,
-pump frequency, fan speed, run state, error state, input voltage, fuel usage,
-and the Afterburner climate entity.
-
-The configuration flow allows the relevant source entities and control limits
-to be selected. Do not assume another installation uses the same entity IDs as
-the included examples.
-
-## 🧠 Control behaviour
-
-The optional active controller works with the stock heater ECU and normal
-Afterburner commands:
+Active control is optional. When enabled, it uses the room temperature,
+Afterburner setpoint, heater state, pump frequency, voltage, and error status to
+decide when a normal stop or start is appropriate.
 
 ```text
-room reaches setpoint + stop offset
-              │
-              ▼
-minimum-fire hold ──► normal ECU shutdown ──► full cooldown
-                                                 │
-room reaches setpoint - start offset             │
-              └──────────────────────────────────┘
+setpoint + stop offset
+        │  minimum-fire hold
+        ▼
+ normal ECU shutdown ──── full cooldown
                               │
-                              ▼
-                       normal ECU start
+setpoint - start offset       │
+        └─────────────────────┘
+                    │
+                    ▼
+             normal ECU start
 ```
 
-Active control is configurable and can be disabled. The integration never
-automatically primes the fuel pump and does not replace the stock ECU shutdown
-sequence.
+An intentional manual stop remains latched until a later setpoint adjustment
+enters the configured start range. The integration does not automatically prime
+the fuel pump and does not bypass the stock ECU shutdown sequence.
 
-## 🏠 Optional occupancy control
+## Fuel and cost accounting
+
+Fuel rate is derived from pump frequency and configurable pump displacement.
+Tank capacity, correction factor, and effective maximum pump frequency are all
+adjustable.
+
+Cost is accumulated incrementally using the diesel price that was active when
+each fuel increment was consumed. Changing today's price does not reprice fuel
+that was burned previously.
+
+## Optional Home/Away control
 
 [`examples/diesel_heater_occupancy.yaml`](examples/diesel_heater_occupancy.yaml)
-provides an example Home Assistant package that:
+is an optional Home Assistant package that adds:
 
-- restores the Home temperature immediately when a tracked `person` arrives;
-- applies an Away temperature after a configurable delay;
-- provides enable and guest-mode switches; and
-- exposes Home, Away, and delay settings for a dashboard card.
+- immediate restoration of the Home temperature on arrival;
+- a configurable Away temperature and departure delay;
+- an enable switch and guest override; and
+- dashboard-friendly mode and temperature controls.
 
-Change `person.your_name` and any entity IDs to match your installation before
-using the example.
+Replace `person.your_name` and the example entity IDs before using it.
 
-## 📊 Dashboards and analytics
+## Dashboards and analytics
 
-Starter Lovelace configuration is available in
-[`examples/dashboard_cards.yaml`](examples/dashboard_cards.yaml). The exposed
-measurements can also be retained by Home Assistant Recorder or exported to
-InfluxDB for Grafana dashboards and long-range analysis.
+[`examples/dashboard_cards.yaml`](examples/dashboard_cards.yaml) contains
+starter Lovelace cards. The integration's measurements can also be retained by
+Home Assistant Recorder or exported to InfluxDB for Grafana dashboards and
+long-range analysis.
 
-## 🧪 Development
+## Development
 
 Run the core test suite without a Home Assistant development environment:
 
@@ -124,24 +115,13 @@ Run the core test suite without a Home Assistant development environment:
 python3 -m unittest discover -s tests -v
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for validation commands and contribution
-guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the remaining validation commands and
+contribution guidelines.
 
-## 🤖 AI disclosure
+## Transparency and license
 
 This project has been developed with substantial generative-AI assistance under
-human direction and hardware supervision. The full disclosure and expectations
-for AI-assisted contributions are documented in
-[AI_DISCLOSURE.md](AI_DISCLOSURE.md).
+human direction and supervised testing on physical hardware. Read the complete
+[AI development disclosure](AI_DISCLOSURE.md).
 
-## ⚖️ License
-
-Afterburner Helper is open source under the permissive [MIT License](LICENSE).
-
-## 🙏 Acknowledgements
-
-- [Afterburner / Bluetooth Heater](https://gitlab.com/mrjones.id.au/bluetoothheater)
-  by Ray Jones and contributors.
-- The Home Assistant, HACS, InfluxDB, and Grafana communities.
-- Operators who contribute sanitized heater telemetry and real-world test
-  results.
+Afterburner Helper is available under the permissive [MIT License](LICENSE).
