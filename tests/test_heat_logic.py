@@ -68,3 +68,15 @@ class HeatGroupTests(unittest.TestCase):
             heat_logic.requested_sources(**values),
             ("electric_2", "diesel"),
         )
+
+    def test_stage_two_stays_on_through_sensor_noise(self):
+        self.assertEqual(heat_logic.hysteretic_stage_count(20.49, 22.0, 1), 2)
+        self.assertEqual(heat_logic.hysteretic_stage_count(20.55, 22.0, 2), 2)
+        self.assertEqual(heat_logic.hysteretic_stage_count(20.80, 22.0, 2), 2)
+
+    def test_stage_two_releases_only_below_its_off_threshold(self):
+        self.assertEqual(heat_logic.hysteretic_stage_count(21.24, 22.0, 2), 2)
+        self.assertEqual(heat_logic.hysteretic_stage_count(21.25, 22.0, 2), 1)
+
+    def test_hysteresis_can_add_multiple_stages_after_restart(self):
+        self.assertEqual(heat_logic.hysteretic_stage_count(18.5, 22.0, 0), 3)

@@ -30,7 +30,7 @@ from .const import (
     HEAT_SOURCES,
     PRIORITY_OPTIONS,
 )
-from .heat_logic import requested_sources
+from .heat_logic import hysteretic_stage_count, requested_sources
 from .temperature import fused_temperature
 
 
@@ -94,6 +94,7 @@ class HeatGroupManager:
         self._last_diesel_command_at = 0.0
         self._last_switch_commands: dict[str, str] = {}
         self._last_switch_command_at: dict[str, float] = {}
+        self._automatic_stage_count = 0
 
     async def async_start(self) -> None:
         saved = await self._store.async_load()
@@ -257,6 +258,15 @@ class HeatGroupManager:
         return StageSnapshot(self.room_temperature, self.target_temperature, self.master_enabled, tuple(active), requested)
 
     def _requested_sources(self) -> tuple[str, ...]:
+        self._automatic_stage_count = (
+            hysteretic_stage_count(
+                self.room_temperature,
+                self.target_temperature,
+                self._automatic_stage_count,
+            )
+            if self.master_enabled
+            else 0
+        )
         return requested_sources(
             room=self.room_temperature,
             master_target=self.target_temperature,
@@ -265,6 +275,7 @@ class HeatGroupManager:
             lockouts=self.lockouts,
             member_modes=self.member_modes,
             member_targets=self.member_targets,
+            automatic_count=self._automatic_stage_count,
         )
 
     async def async_reconcile(self) -> None:

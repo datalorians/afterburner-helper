@@ -169,6 +169,7 @@ class AfterburnerCoordinator(DataUpdateCoordinator[AfterburnerData]):
         self._decision_history: deque[str] = deque(maxlen=50)
         self._owned_service_contexts: deque[str] = deque(maxlen=20)
         self._cost_ledger = FuelCostLedger()
+        self.heat_group = None
 
     @property
     def active_control_enabled(self) -> bool:
@@ -333,6 +334,11 @@ class AfterburnerCoordinator(DataUpdateCoordinator[AfterburnerData]):
     @callback
     def _service_called(self, event: Event) -> None:
         """Treat an external climate Off command as a manual-stop override."""
+        # The staged heat group is the sole owner of diesel start/stop. Its
+        # commands must not be reinterpreted by the retired diesel-only cycle
+        # controller as a user manual stop.
+        if self.heat_group is not None:
+            return
         if event.data.get("domain") != "climate":
             return
         if event.data.get("service") != "set_hvac_mode":
@@ -511,6 +517,11 @@ class AfterburnerCoordinator(DataUpdateCoordinator[AfterburnerData]):
 
     async def _async_apply_control(self, data: AfterburnerData) -> None:
         if not self.active_control_enabled:
+            return
+        # Multi-source staging owns the diesel climate entity. Running the
+        # legacy thermal-cycle actuator in parallel creates two controllers
+        # with different temperature inputs and causes short cycling.
+        if self.heat_group is not None:
             return
         async with self._actuation_lock:
             try:
