@@ -18,6 +18,9 @@ from .const import (
     CONF_ELECTRIC_HEATER_1_ENTITY_ID,
     CONF_ELECTRIC_HEATER_2_ENTITY_ID,
     CONF_FUSED_TEMPERATURE_ENTITIES,
+    CONF_FAILED_START_RETRY_MINUTES,
+    CONF_MINIMUM_OFF_CYCLE_MINUTES,
+    CONF_MINIMUM_ON_CYCLE_MINUTES,
     CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
     CONF_ROOM_TEMPERATURE_ENTITY_ID,
     CONF_USE_FUSED_TEMPERATURE,
@@ -25,6 +28,9 @@ from .const import (
     DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID,
     DEFAULT_ELECTRIC_HEATER_2_ENTITY_ID,
     DEFAULT_FUSED_TEMPERATURE_ENTITIES,
+    DEFAULT_FAILED_START_RETRY_MINUTES,
+    DEFAULT_MINIMUM_OFF_CYCLE_MINUTES,
+    DEFAULT_MINIMUM_ON_CYCLE_MINUTES,
     DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
     DEFAULT_ROOM_TEMPERATURE_ENTITY_ID,
     DEFAULT_USE_FUSED_TEMPERATURE,
@@ -32,7 +38,12 @@ from .const import (
     PRIORITY_OPTIONS,
     SOURCE_ENTITIES,
 )
-from .heat_logic import hysteretic_stage_count, requested_sources
+from .heat_logic import (
+    hysteretic_stage_count,
+    minimum_cycle_decision,
+    requested_sources,
+)
+from .control import RunPhase, normalize_run_state
 from .temperature import fused_temperature
 
 
@@ -79,6 +90,24 @@ class HeatGroupManager:
             CONF_OUTDOOR_TEMPERATURE_ENTITY_ID,
             DEFAULT_OUTDOOR_TEMPERATURE_ENTITY_ID,
         )
+        self.minimum_on_seconds = 60.0 * float(
+            options.get(
+                CONF_MINIMUM_ON_CYCLE_MINUTES,
+                DEFAULT_MINIMUM_ON_CYCLE_MINUTES,
+            )
+        )
+        self.minimum_off_seconds = 60.0 * float(
+            options.get(
+                CONF_MINIMUM_OFF_CYCLE_MINUTES,
+                DEFAULT_MINIMUM_OFF_CYCLE_MINUTES,
+            )
+        )
+        self.failed_start_retry_seconds = 60.0 * float(
+            options.get(
+                CONF_FAILED_START_RETRY_MINUTES,
+                DEFAULT_FAILED_START_RETRY_MINUTES,
+            )
+        )
         self.diesel_entity = options.get(CONF_CLIMATE_ENTITY_ID, DEFAULT_CLIMATE_ENTITY_ID)
         self.electric_entities = {
             "electric_1": options.get(CONF_ELECTRIC_HEATER_1_ENTITY_ID, DEFAULT_ELECTRIC_HEATER_1_ENTITY_ID),
@@ -93,7 +122,9 @@ class HeatGroupManager:
         self._listeners: set[Any] = set()
         self._unsub = None
         self._startup_unsub = None
-        self._retry_unsub = None
+        self._pending_unsub = None
+        self._pending_due = 0.0
+        self._decision_generation = 0
         self._startup_ready = False
         self._startup_seen_temperature_sources: set[str] = set()
         self._lock = asyncio.Lock()
@@ -105,6 +136,10 @@ class HeatGroupManager:
         self._last_switch_commands: dict[str, str] = {}
         self._last_switch_command_at: dict[str, float] = {}
         self._automatic_stage_count = 0
+        self._observed_active: dict[str, bool] = {}
+        self._last_transition_at: dict[str, float] = {}
+        self._diesel_reached_running = False
+        self._diesel_last_stop_was_failed_start = False
 
     async def async_start(self) -> None:
         saved = await self._store.async_load()
@@ -164,9 +199,7 @@ class HeatGroupManager:
         if self._startup_unsub:
             self._startup_unsub()
             self._startup_unsub = None
-        if self._retry_unsub:
-            self._retry_unsub()
-            self._retry_unsub = None
+        self._cancel_pending_reconcile()
 
     @callback
     def _state_changed(self, event) -> None:
@@ -260,7 +293,9 @@ class HeatGroupManager:
         return round(self.room_temperature - self.outdoor_temperature, 2)
 
     def snapshot(self) -> StageSnapshot:
-        requested = self._requested_sources()
+        # Entity rendering is read-only. Only reconciliation may advance the
+        # hysteretic stage state.
+        requested = self._requested_sources(update_stage=False)
         active = []
         diesel = self.hass.states.get(self.diesel_entity)
         if diesel and diesel.state == "heat":
@@ -271,17 +306,18 @@ class HeatGroupManager:
                 active.append(source)
         return StageSnapshot(self.room_temperature, self.target_temperature, self.master_enabled, tuple(active), requested)
 
-    def _requested_sources(self) -> tuple[str, ...]:
+    def _requested_sources(self, *, update_stage: bool = True) -> tuple[str, ...]:
         automatic_enabled = self._automatic_control_enabled()
-        self._automatic_stage_count = (
-            hysteretic_stage_count(
-                self.room_temperature,
-                self.target_temperature,
-                self._automatic_stage_count,
+        if update_stage:
+            self._automatic_stage_count = (
+                hysteretic_stage_count(
+                    self.room_temperature,
+                    self.target_temperature,
+                    self._automatic_stage_count,
+                )
+                if self.master_enabled and automatic_enabled
+                else 0
             )
-            if self.master_enabled and automatic_enabled
-            else 0
-        )
         return requested_sources(
             room=self.room_temperature,
             master_target=self.target_temperature,
@@ -302,11 +338,90 @@ class HeatGroupManager:
                 self._notify()
                 return
             requested = self._requested_sources()
-            await self._set_diesel("diesel" in requested)
+            now = self.hass.loop.time()
+            actual = self._observe_source_states(now)
+            diesel_command = self._transition_command(
+                "diesel",
+                "diesel" in requested,
+                actual["diesel"],
+                now,
+            )
+            if diesel_command is not None:
+                await self._set_diesel(diesel_command)
             for source, entity_id in self.electric_entities.items():
                 if entity_id:
-                    await self._set_switch(entity_id, source in requested)
+                    command = self._transition_command(
+                        source,
+                        source in requested,
+                        actual[source],
+                        now,
+                    )
+                    if command is not None:
+                        await self._set_switch(entity_id, command)
             self._notify()
+
+    def _observe_source_states(self, now: float) -> dict[str, bool]:
+        """Observe physical states and timestamp only confirmed transitions."""
+        run_state = self.hass.states.get(SOURCE_ENTITIES["run_state"])
+        diesel_phase = normalize_run_state(run_state.state if run_state else None)
+        active = {
+            "diesel": diesel_phase
+            not in {RunPhase.OFF, RunPhase.UNKNOWN},
+            **{
+                source: bool(
+                    entity_id
+                    and (state := self.hass.states.get(entity_id))
+                    and state.state == STATE_ON
+                )
+                for source, entity_id in self.electric_entities.items()
+            },
+        }
+        if diesel_phase is RunPhase.RUNNING:
+            self._diesel_reached_running = True
+        for source, is_active in active.items():
+            if source not in self._observed_active:
+                self._observed_active[source] = is_active
+                self._last_transition_at[source] = now
+            elif self._observed_active[source] != is_active:
+                if source == "diesel" and not is_active:
+                    self._diesel_last_stop_was_failed_start = (
+                        not self._diesel_reached_running
+                    )
+                    self._diesel_reached_running = False
+                elif source == "diesel" and is_active:
+                    self._diesel_last_stop_was_failed_start = False
+                self._observed_active[source] = is_active
+                self._last_transition_at[source] = now
+        return active
+
+    def _transition_command(
+        self,
+        source: str,
+        desired_on: bool,
+        actual_on: bool,
+        now: float,
+    ) -> bool | None:
+        """Apply minimum-cycle policy to the current, freshly computed demand."""
+        force_off = (
+            not self.master_enabled
+            or not self._automatic_control_enabled()
+            or self.member_modes[source] == "off"
+            or (self.lockouts[source] and self.member_modes[source] != "heat")
+        )
+        minimum_off_seconds = self.minimum_off_seconds
+        if source == "diesel" and self._diesel_last_stop_was_failed_start:
+            minimum_off_seconds = self.failed_start_retry_seconds
+        command, delay = minimum_cycle_decision(
+            desired_on=desired_on,
+            actual_on=actual_on,
+            elapsed_seconds=now - self._last_transition_at.get(source, now),
+            minimum_on_seconds=self.minimum_on_seconds,
+            minimum_off_seconds=minimum_off_seconds,
+            force_off=force_off,
+        )
+        if delay is not None:
+            self._schedule_confirmation_retry(max(1, int(delay + 0.999)))
+        return command
 
     async def _set_diesel(self, enabled: bool) -> None:
         state = self.hass.states.get(self.diesel_entity)
@@ -381,16 +496,32 @@ class HeatGroupManager:
             self._schedule_confirmation_retry(3)
 
     def _schedule_confirmation_retry(self, delay: int) -> None:
-        """Retry an unconfirmed physical command without waiting for polling."""
-        if self._retry_unsub is not None:
+        """Schedule a fresh decision, never a replay of an old command."""
+        due = self.hass.loop.time() + delay
+        if self._pending_unsub is not None and due >= self._pending_due:
             return
+        if self._pending_unsub is not None:
+            self._pending_unsub()
+        generation = self._decision_generation
+        self._pending_due = due
 
         @callback
         def _retry(_now) -> None:
-            self._retry_unsub = None
+            self._pending_unsub = None
+            self._pending_due = 0.0
+            if generation != self._decision_generation:
+                return
             self.hass.async_create_task(self.async_reconcile())
 
-        self._retry_unsub = async_call_later(self.hass, delay, _retry)
+        self._pending_unsub = async_call_later(self.hass, delay, _retry)
+
+    def _cancel_pending_reconcile(self) -> None:
+        """Invalidate every decision made before the latest user change."""
+        self._decision_generation += 1
+        if self._pending_unsub is not None:
+            self._pending_unsub()
+            self._pending_unsub = None
+        self._pending_due = 0.0
 
     async def async_set_master_enabled(self, enabled: bool) -> None:
         self.master_enabled = enabled
@@ -413,6 +544,7 @@ class HeatGroupManager:
         await self._changed()
 
     async def async_set_lockout(self, source: str, locked: bool) -> None:
+        self._cancel_pending_reconcile()
         self.lockouts[source] = locked
         # Lockout is an immediate actuator command. Automatic mode stays
         # selected so unlocking can return the source to group control; only
@@ -435,6 +567,7 @@ class HeatGroupManager:
         await self._changed()
 
     async def _changed(self) -> None:
+        self._cancel_pending_reconcile()
         self._last_diesel_command = None
         self._last_diesel_command_at = 0.0
         self._last_switch_commands.clear()

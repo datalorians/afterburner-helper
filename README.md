@@ -89,13 +89,15 @@ the fuel pump and does not bypass the stock ECU shutdown sequence.
 
 ## Staged diesel and electric heat
 
-Version 2.5 provides one master climate control for the complete heating group and
+Version 2.7 provides one master climate control for the complete heating group and
 member climate controls for diesel plus two optional smart-plug heaters.
 
 - Choose any of the six diesel / Electric 1 / Electric 2 priority orders.
 - Lock out any source independently without losing its configured target.
 - Leave a member in **Auto** to follow the master demand.
-- Set a member to **Heat** or **Off** for a persistent manual override.
+- The master **Off** state always forces the complete group off.
+- With the master in **Heat**, set a member to **Heat** or **Off** for a
+  persistent manual override.
 - Assign both electric-heater switch entities in the integration options.
 - Propagate every master setpoint change to all three member thermostats.
 
@@ -124,6 +126,17 @@ second at 1.5 °C below demand, and the third at 3.0 °C below demand. Locked-ou
 or manually disabled sources are skipped and the next available source fills
 their place. Electric Heater 1 defaults to
 `switch.s31_3_sonoff_s31_relay`; Electric Heater 2 is unassigned until selected.
+
+Stage changes use separate enter/leave thresholds plus configurable minimum
+on-cycle and minimum off-cycle durations (20 and 10 minutes by default). A
+master, setpoint, lockout, or member-mode change invalidates every pending
+staging decision. Delayed callbacks only request a fresh calculation and never
+replay an earlier actuator command.
+
+A diesel ignition attempt that returns to Ready without ever reaching Running
+uses a separate failed-start retry delay (1 minute by default), rather than the
+normal minimum off-cycle duration. A diesel cycle that reached Running always
+receives the full off-cycle protection.
 
 ## Fuel and cost accounting
 

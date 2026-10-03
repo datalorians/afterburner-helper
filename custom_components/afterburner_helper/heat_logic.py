@@ -61,6 +61,10 @@ def requested_sources(
     member_targets: dict[str, float],
     automatic_count: int | None = None,
 ) -> tuple[str, ...]:
+    # The master thermostat is authoritative. Member controls refine a live
+    # group; they cannot energize a source while the group itself is Off.
+    if not master_enabled:
+        return ()
     sources = ("diesel", "electric_1", "electric_2")
     ordered = ordered_sources(priority)
     count = (
@@ -81,3 +85,28 @@ def requested_sources(
         elif mode == "auto" and source in automatic:
             requested.append(source)
     return tuple(requested)
+
+
+def minimum_cycle_decision(
+    *,
+    desired_on: bool,
+    actual_on: bool,
+    elapsed_seconds: float,
+    minimum_on_seconds: float,
+    minimum_off_seconds: float,
+    force_off: bool = False,
+) -> tuple[bool | None, float | None]:
+    """Return an actuator command and optional delay for anti-short-cycling.
+
+    None means do not command a transition yet. Master Off, member Off, and
+    lockout are explicit force-off controls and bypass minimum-on duration.
+    """
+    if desired_on == actual_on:
+        return None, None
+    if not desired_on and force_off:
+        return False, None
+    required = minimum_off_seconds if desired_on else minimum_on_seconds
+    remaining = max(0.0, required - max(0.0, elapsed_seconds))
+    if remaining > 0:
+        return None, remaining
+    return desired_on, None
