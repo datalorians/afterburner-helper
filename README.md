@@ -138,6 +138,11 @@ uses a separate failed-start retry delay (1 minute by default), rather than the
 normal minimum off-cycle duration. A diesel cycle that reached Running always
 receives the full off-cycle protection.
 
+Actuator ownership is command-based: the group automatically turns off only a
+source that it previously turned on. Master Off, member Off, and lockout each
+send one immediate Off command and then release the actuator, so a configured
+smart plug can subsequently be used manually without being forced off again.
+
 ## Fuel and cost accounting
 
 Fuel rate is derived from pump frequency and configurable pump displacement.

@@ -140,6 +140,7 @@ class HeatGroupManager:
         self._last_transition_at: dict[str, float] = {}
         self._diesel_reached_running = False
         self._diesel_last_stop_was_failed_start = False
+        self._owned_sources: set[str] = set()
 
     async def async_start(self) -> None:
         saved = await self._store.async_load()
@@ -337,6 +338,12 @@ class HeatGroupManager:
             if not self._startup_ready:
                 self._notify()
                 return
+            # Off means the group has relinquished its actuators. The explicit
+            # master-Off/member-Off/lockout handlers send one shutdown command;
+            # subsequent external smart-plug use must not be policed.
+            if not self.master_enabled or not self._automatic_control_enabled():
+                self._notify()
+                return
             requested = self._requested_sources()
             now = self.hass.loop.time()
             actual = self._observe_source_states(now)
@@ -388,8 +395,11 @@ class HeatGroupManager:
                         not self._diesel_reached_running
                     )
                     self._diesel_reached_running = False
+                    self._owned_sources.discard(source)
                 elif source == "diesel" and is_active:
                     self._diesel_last_stop_was_failed_start = False
+                if not is_active:
+                    self._owned_sources.discard(source)
                 self._observed_active[source] = is_active
                 self._last_transition_at[source] = now
         return active
@@ -408,6 +418,10 @@ class HeatGroupManager:
             or self.member_modes[source] == "off"
             or (self.lockouts[source] and self.member_modes[source] != "heat")
         )
+        # Never turn off an actuator merely because it is configured here.
+        # Automatic de-staging applies only to sources this manager turned on.
+        if not desired_on and source not in self._owned_sources:
+            return None
         minimum_off_seconds = self.minimum_off_seconds
         if source == "diesel" and self._diesel_last_stop_was_failed_start:
             minimum_off_seconds = self.failed_start_retry_seconds
@@ -465,6 +479,10 @@ class HeatGroupManager:
             self._diesel_contexts.append(context.id)
         await self.hass.services.async_call("climate", "set_hvac_mode", {"entity_id": self.diesel_entity, "hvac_mode": mode}, blocking=True, context=context)
         if enabled:
+            self._owned_sources.add("diesel")
+        else:
+            self._owned_sources.discard("diesel")
+        if enabled:
             self._schedule_confirmation_retry(10)
 
     async def _set_switch(self, entity_id: str, enabled: bool) -> None:
@@ -493,6 +511,19 @@ class HeatGroupManager:
                 blocking=True,
                 context=context,
             )
+            source = next(
+                (
+                    key
+                    for key, configured_entity in self.electric_entities.items()
+                    if configured_entity == entity_id
+                ),
+                None,
+            )
+            if source is not None:
+                if enabled:
+                    self._owned_sources.add(source)
+                else:
+                    self._owned_sources.discard(source)
             self._schedule_confirmation_retry(3)
 
     def _schedule_confirmation_retry(self, delay: int) -> None:
@@ -525,6 +556,11 @@ class HeatGroupManager:
 
     async def async_set_master_enabled(self, enabled: bool) -> None:
         self.master_enabled = enabled
+        if not enabled:
+            self._cancel_pending_reconcile()
+            await self._async_explicit_group_off()
+            await self._changed_without_reconcile()
+            return
         await self._changed()
 
     async def async_set_target(self, temperature: float) -> None:
@@ -550,17 +586,32 @@ class HeatGroupManager:
         # selected so unlocking can return the source to group control; only
         # an explicit member Heat mode is allowed to override the lockout.
         if locked and self.member_modes[source] != "heat":
-            if source == "diesel":
-                await self._set_diesel(False)
-            else:
-                entity_id = self.electric_entities.get(source)
-                if entity_id:
-                    await self._set_switch(entity_id, False)
+            await self._async_explicit_source_off(source)
         await self._changed()
 
     async def async_set_member_mode(self, source: str, mode: str) -> None:
+        self._cancel_pending_reconcile()
         self.member_modes[source] = mode
+        if mode == "off":
+            await self._async_explicit_source_off(source)
         await self._changed()
+
+    async def _async_explicit_group_off(self) -> None:
+        """Send one authoritative group shutdown, then release all sources."""
+        await self._async_explicit_source_off("diesel")
+        for source in self.electric_entities:
+            await self._async_explicit_source_off(source)
+        self._owned_sources.clear()
+
+    async def _async_explicit_source_off(self, source: str) -> None:
+        """Send one user-requested Off command without continuous policing."""
+        if source == "diesel":
+            await self._set_diesel(False)
+        else:
+            entity_id = self.electric_entities.get(source)
+            if entity_id:
+                await self._set_switch(entity_id, False)
+        self._owned_sources.discard(source)
 
     async def async_set_member_target(self, source: str, temperature: float) -> None:
         self.member_targets[source] = temperature
