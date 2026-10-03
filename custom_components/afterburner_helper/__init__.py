@@ -36,6 +36,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass,
         entry,
         coordinator._owned_service_contexts,
+        automatic_control_enabled=lambda: coordinator.active_control_enabled,
     )
     await coordinator.heat_group.async_start()
     await coordinator.async_initialize()

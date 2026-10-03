@@ -61,6 +61,13 @@ class HeatGroupTests(unittest.TestCase):
             ("electric_1",),
         )
 
+    def test_global_automatic_gate_stops_auto_but_allows_manual_heat(self):
+        values = self.defaults()
+        values["master_enabled"] = False
+        self.assertEqual(heat_logic.requested_sources(**values), ())
+        values["member_modes"]["diesel"] = "heat"
+        self.assertEqual(heat_logic.requested_sources(**values), ("diesel",))
+
     def test_manual_off_overrides_group_demand(self):
         values = self.defaults()
         values["member_modes"]["electric_1"] = "off"

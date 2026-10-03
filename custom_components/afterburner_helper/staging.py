@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -47,7 +48,13 @@ class StageSnapshot:
 class HeatGroupManager:
     """Persist group preferences and reconcile requested heat sources."""
 
-    def __init__(self, hass: HomeAssistant, entry: ConfigEntry, diesel_contexts=None) -> None:
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        entry: ConfigEntry,
+        diesel_contexts=None,
+        automatic_control_enabled: Callable[[], bool] | None = None,
+    ) -> None:
         self.hass = hass
         self.entry = entry
         options = {**entry.data, **entry.options}
@@ -92,6 +99,7 @@ class HeatGroupManager:
         self._lock = asyncio.Lock()
         self._store = Store(hass, 1, f"afterburner_helper.{entry.entry_id}.heat_group")
         self._diesel_contexts = diesel_contexts
+        self._automatic_control_enabled = automatic_control_enabled or (lambda: True)
         self._last_diesel_command: str | None = None
         self._last_diesel_command_at = 0.0
         self._last_switch_commands: dict[str, str] = {}
@@ -264,19 +272,23 @@ class HeatGroupManager:
         return StageSnapshot(self.room_temperature, self.target_temperature, self.master_enabled, tuple(active), requested)
 
     def _requested_sources(self) -> tuple[str, ...]:
+        automatic_enabled = self._automatic_control_enabled()
         self._automatic_stage_count = (
             hysteretic_stage_count(
                 self.room_temperature,
                 self.target_temperature,
                 self._automatic_stage_count,
             )
-            if self.master_enabled
+            if self.master_enabled and automatic_enabled
             else 0
         )
         return requested_sources(
             room=self.room_temperature,
             master_target=self.target_temperature,
-            master_enabled=self.master_enabled,
+            # Active control is the global authority for automatic staging.
+            # Manual member Heat modes remain explicit user commands and are
+            # intentionally handled by requested_sources even when false.
+            master_enabled=self.master_enabled and automatic_enabled,
             priority=self.priority,
             lockouts=self.lockouts,
             member_modes=self.member_modes,
